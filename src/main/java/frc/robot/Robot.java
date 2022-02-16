@@ -10,9 +10,11 @@ import com.ctre.phoenix.motorcontrol.can.WPI_TalonFX;
 import com.ctre.phoenix.sensors.Pigeon2;
 import com.ctre.phoenix.sensors.PigeonIMU;
 
+import com.ctre.phoenix.sensors.WPI_Pigeon2;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.PS4Controller;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.drive.MecanumDrive;
 import edu.wpi.first.wpilibj.motorcontrol.PWMTalonFX;
 import edu.wpi.first.wpilibj.motorcontrol.Talon;
@@ -35,11 +37,13 @@ public class Robot extends TimedRobot {
   WPI_TalonFX frontRight;
 
   PS4Controller logitech;
-
+  XboxController xbox;
   MecanumDrive driveTrain;
   // both work, figure out difference next
   WPI_TalonFX backRight;
   double[] direction = {0.0, 0.0, 0.0};
+
+  WPI_Pigeon2 pigeon2;
 
   public Robot() {
     super();
@@ -62,10 +66,11 @@ public class Robot extends TimedRobot {
     frontLeft.setInverted(true);
     pigeon = new PigeonIMU(12);
     pigeon.configFactoryDefault();
-    pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.Accelerometer);
+    pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
     driveTrain = new MecanumDrive(frontLeft, backLeft, frontRight, backRight);
 
     pigeon.getYawPitchRoll(direction);
+    pigeon2 = new WPI_Pigeon2(12);
   }
 
   @Override
@@ -94,6 +99,10 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopInit() {
     logitech = new PS4Controller(0);
+    xbox = new XboxController(0);
+    pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
+    pigeon.configFactoryDefault();
+    pigeon2.reset();
   }
 
   @Override
@@ -101,10 +110,11 @@ public class Robot extends TimedRobot {
     pigeon.getYawPitchRoll(direction);
 
 
-    // Try to figure out field oriented control with gyro and how that's supposed to work.
-    System.out.println("yaw " + direction[0]);
+    System.out.println("yaw " + pigeon2.getAngle());
+    System.out.println(xbox.getRightX());
 
-    driveTrain.driveCartesian(-logitech.getLeftY(), logitech.getLeftX(), logitech.getRightY(), -direction[0]);
+
+    driveTrain.driveCartesian(-xbox.getLeftY(), xbox.getLeftX(), xbox.getRightX(), pigeon2.getAngle());
 //    if (logitech.getR1Button()) {
 //      driveTrain.driveCartesian(0, 0.4, logitech.getRightY(), direction[0]);
 //    } else if (logitech.getL1Button()) {
