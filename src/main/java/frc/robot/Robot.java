@@ -11,14 +11,12 @@ import com.ctre.phoenix.sensors.Pigeon2;
 import com.ctre.phoenix.sensors.PigeonIMU;
 
 import com.ctre.phoenix.sensors.WPI_Pigeon2;
-import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.PS4Controller;
-import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.drive.MecanumDrive;
 import edu.wpi.first.wpilibj.motorcontrol.PWMTalonFX;
 import edu.wpi.first.wpilibj.motorcontrol.Talon;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to
@@ -31,6 +29,9 @@ public class Robot extends TimedRobot {
    * This function is run when the robot is first started up and should be used for any
    * initialization code.
    */
+
+  SerialPort arduino;
+
   PigeonIMU pigeon;
   WPI_TalonFX backLeft;
   WPI_TalonFX frontLeft;
@@ -71,6 +72,16 @@ public class Robot extends TimedRobot {
 
     pigeon.getYawPitchRoll(direction);
     pigeon2 = new WPI_Pigeon2(12);
+    try {
+      arduino = new SerialPort(115200, SerialPort.Port.kUSB);
+    } catch (Exception exception){
+      System.out.println("I SCREWED UP 1");
+      try {
+        arduino = new SerialPort(115200, SerialPort.Port.kUSB2);
+      } catch (Exception exception1){
+        System.out.println("I SCREWED UP 2");
+      }
+    }
   }
 
   @Override
@@ -114,7 +125,7 @@ public class Robot extends TimedRobot {
     System.out.println(xbox.getRightX());
 
 
-    driveTrain.driveCartesian(-xbox.getLeftY(), xbox.getLeftX(), xbox.getRightX(), pigeon2.getAngle());
+    driveTrain.driveCartesian(-xbox.getLeftY(), xbox.getLeftX(), -xbox.getRightX(), pigeon2.getAngle());
 //    if (logitech.getR1Button()) {
 //      driveTrain.driveCartesian(0, 0.4, logitech.getRightY(), direction[0]);
 //    } else if (logitech.getL1Button()) {
@@ -140,7 +151,9 @@ public class Robot extends TimedRobot {
   public void testInit() {}
 
   @Override
-  public void testPeriodic() {}
+  public void testPeriodic() {
+    System.out.println(arduino.readString());
+  }
 
   @Override
   public void simulationInit() {}
