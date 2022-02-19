@@ -5,8 +5,10 @@
 package frc.robot;
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.DemandType;
+import com.ctre.phoenix.motorcontrol.FeedbackDevice;
 import com.ctre.phoenix.motorcontrol.can.TalonFX;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonFX;
+import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 import com.ctre.phoenix.sensors.Pigeon2;
 import com.ctre.phoenix.sensors.PigeonIMU;
 
@@ -33,18 +35,20 @@ public class Robot extends TimedRobot {
   SerialPort arduino;
 
   PigeonIMU pigeon;
-  WPI_TalonFX backLeft;
-  WPI_TalonFX frontLeft;
-  WPI_TalonFX frontRight;
+  WPI_TalonSRX backLeft;
+  WPI_TalonSRX frontLeft;
+  WPI_TalonSRX frontRight;
+  WPI_TalonSRX backRight;
 
   PS4Controller logitech;
   XboxController xbox;
   MecanumDrive driveTrain;
-  // both work, figure out difference next
-  WPI_TalonFX backRight;
+
+
   double[] direction = {0.0, 0.0, 0.0};
 
   WPI_Pigeon2 pigeon2;
+
 
   public Robot() {
     super();
@@ -58,13 +62,19 @@ public class Robot extends TimedRobot {
   public void robotInit() {
     // Ports based on CAN id, found through phoenix tuner and running the diagnostic server
 
-    backLeft = new WPI_TalonFX(2);
-    frontLeft = new WPI_TalonFX(1);
-    frontRight = new WPI_TalonFX(3);
-    backRight = new WPI_TalonFX(4);
+    backLeft = new WPI_TalonSRX(2);
+    frontLeft = new WPI_TalonSRX(1);
+    frontRight = new WPI_TalonSRX(3);
+    backRight = new WPI_TalonSRX(4);
+
+    frontLeft.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
+    backLeft.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
+    frontRight.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
+    backRight.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
 
     backLeft.setInverted(true);
     frontLeft.setInverted(true);
+
     pigeon = new PigeonIMU(12);
     pigeon.configFactoryDefault();
     pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
@@ -88,23 +98,30 @@ public class Robot extends TimedRobot {
   public void robotPeriodic() {}
 
   @Override
-  public void autonomousInit() {}
+  public void autonomousInit() {
+
+    frontLeft.setSensorPhase(true);
+    backLeft.setSensorPhase(true);
+    frontRight.setSensorPhase(true);
+    backRight.setSensorPhase(true);
+    frontLeft.setSelectedSensorPosition(0.0);
+    backLeft.setSelectedSensorPosition(0.0);
+    frontRight.setSelectedSensorPosition(0.0);
+    backRight.setSelectedSensorPosition(0.0);
+    frontRight.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.0);
+    backLeft.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.0);
+    frontLeft.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.0);
+    backRight.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.0);
+  }
 
   @Override
   public void autonomousPeriodic() {
-    frontRight.set(ControlMode.PercentOutput, -0.2);
-    backLeft.set(ControlMode.PercentOutput,0.2);
-    frontLeft.set(ControlMode.PercentOutput,-0.2);
-    backRight.set(ControlMode.PercentOutput, 0.2);
-    pigeon.getYawPitchRoll(direction);
-    // prints to the console of the driver station (under the settings cog wheel on the right)
-    System.out.println("yaw " + direction[0]);
-    System.out.println("pitch " + direction[1]);
-    System.out.println("roll " + direction[2]);
-    // this works
-    SmartDashboard.putNumber("yaw", direction[0]);
-    SmartDashboard.putNumber("pitch", direction[1]);
-    SmartDashboard.putNumber("roll", direction[2]);
+    frontRight.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
+    backLeft.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
+    frontLeft.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
+    backRight.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
+    //driveTrain.driveCartesian(0.2, 0.0, 0.0);
+    System.out.println(backLeft.getSelectedSensorPosition());
   }
 
   @Override
@@ -114,6 +131,7 @@ public class Robot extends TimedRobot {
     pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
     pigeon.configFactoryDefault();
     pigeon2.reset();
+    frontLeft.setSelectedSensorPosition(0.0);
   }
 
   @Override
@@ -122,9 +140,15 @@ public class Robot extends TimedRobot {
 
 
     System.out.println("yaw " + pigeon2.getAngle());
-    System.out.println(xbox.getRightX());
+    System.out.printf("Front Left: %f, Front Right: %f, Back Left: %f, Back Right: %f %n",
+            frontLeft.getSelectedSensorPosition(), frontRight.getSelectedSensorPosition(),backLeft.getSelectedSensorPosition(),backRight.getSelectedSensorPosition());
 
-
+    if (xbox.getAButtonPressed()) {
+      frontLeft.setSelectedSensorPosition(0.0);
+      backLeft.setSelectedSensorPosition(0.0);
+      frontRight.setSelectedSensorPosition(0.0);
+      backRight.setSelectedSensorPosition(0.0);
+    }
     driveTrain.driveCartesian(-xbox.getLeftY(), xbox.getLeftX(), -xbox.getRightX(), pigeon2.getAngle());
 //    if (logitech.getR1Button()) {
 //      driveTrain.driveCartesian(0, 0.4, logitech.getRightY(), direction[0]);
