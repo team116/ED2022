@@ -13,11 +13,16 @@ import com.ctre.phoenix.sensors.Pigeon2;
 import com.ctre.phoenix.sensors.PigeonIMU;
 
 import com.ctre.phoenix.sensors.WPI_Pigeon2;
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.networktables.NetworkTable;
+import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.drive.MecanumDrive;
 import edu.wpi.first.wpilibj.motorcontrol.PWMTalonFX;
 import edu.wpi.first.wpilibj.motorcontrol.Talon;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
+import javax.naming.ldap.Control;
 
 
 /**
@@ -40,15 +45,36 @@ public class Robot extends TimedRobot {
   WPI_TalonSRX frontRight;
   WPI_TalonSRX backRight;
 
+  WPI_TalonSRX intake;
+  DoubleSolenoid intakeRelease;
+
+  WPI_TalonFX shooter;
+
+  DoubleSolenoid shooterHammer;
+
+  WPI_TalonFX leftClimber;
+  WPI_TalonFX rightClimber;
+
+  WPI_TalonFX testFalcon;
+
   PS4Controller logitech;
   XboxController xbox;
   MecanumDrive driveTrain;
 
+  NetworkTable limeLight;
 
   double[] direction = {0.0, 0.0, 0.0};
 
   WPI_Pigeon2 pigeon2;
 
+  private final int RADIUS_OF_WHEEL = 3;
+  private final double GEAR_RATIO = 10.71;
+  private final int TICKS_PER_REVOLUTION = 2048;
+
+  private final double TICKS_PER_INCH = (TICKS_PER_REVOLUTION * GEAR_RATIO) / (RADIUS_OF_WHEEL * 2 * Math.PI);
+
+  private final double kP = 1.0;
+  private final double kD = 1.0;
 
   public Robot() {
     super();
@@ -67,18 +93,30 @@ public class Robot extends TimedRobot {
     frontRight = new WPI_TalonSRX(3);
     backRight = new WPI_TalonSRX(4);
 
+    testFalcon = new WPI_TalonFX(16);
+
     frontLeft.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
     backLeft.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
     frontRight.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
     backRight.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
 
+    frontLeft.setSensorPhase(true);
+    backLeft.setSensorPhase(true);
+    frontRight.setSensorPhase(true);
+    backRight.setSensorPhase(true);
+
     backLeft.setInverted(true);
     frontLeft.setInverted(true);
+
+    /***
+    CHANGE LOCATIONS
+     */
+    shooter = new WPI_TalonFX(5);
 
     pigeon = new PigeonIMU(12);
     pigeon.configFactoryDefault();
     pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
-    driveTrain = new MecanumDrive(frontLeft, backLeft, frontRight, backRight);
+    //driveTrain = new MecanumDrive(frontLeft, backLeft, frontRight, backRight);
 
     pigeon.getYawPitchRoll(direction);
     pigeon2 = new WPI_Pigeon2(12);
@@ -88,10 +126,16 @@ public class Robot extends TimedRobot {
       System.out.println("I SCREWED UP 1");
       try {
         arduino = new SerialPort(115200, SerialPort.Port.kUSB2);
-      } catch (Exception exception1){
+      } catch (Exception exception1) {
         System.out.println("I SCREWED UP 2");
       }
     }
+
+    //shooterHammer = new DoubleSolenoid(PneumaticsModuleType.CTREPCM, 0, 1 );
+
+    shooter.set(ControlMode.Velocity, 0.0);
+
+    limeLight = NetworkTableInstance.getDefault().getTable("limelight");
   }
 
   @Override
@@ -108,20 +152,48 @@ public class Robot extends TimedRobot {
     backLeft.setSelectedSensorPosition(0.0);
     frontRight.setSelectedSensorPosition(0.0);
     backRight.setSelectedSensorPosition(0.0);
-    frontRight.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.0);
-    backLeft.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.0);
-    frontLeft.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.0);
-    backRight.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.0);
+//    frontRight.set(ControlMode.Position, 1000);
+//    backLeft.set(ControlMode.Position, 1000);
+//    frontLeft.set(ControlMode.Position, 1000);
+//    backRight.set(ControlMode.Position, 1000);
+//    frontLeft.set(ControlMode.PercentOutput, 0.0);
+//    backLeft.set(ControlMode.PercentOutput, 0.0);
+//    frontRight.set(ControlMode.PercentOutput, 0.0);
+//    backRight.set(ControlMode.PercentOutput, 0.0);
+    backLeft.selectProfileSlot(0,0);
+    frontLeft.selectProfileSlot(0,0);
+    backRight.selectProfileSlot(0,0);
+    frontRight.selectProfileSlot(0,0);
+
+    backLeft.config_kP(0, kP);
+    frontLeft.config_kP(0, kP);
+    backRight.config_kP(0, kP);
+    frontRight.config_kP(0, kP);
+
+    testFalcon.configSelectedFeedbackSensor(FeedbackDevice.IntegratedSensor);
+    testFalcon.setSelectedSensorPosition(0.0);
+
+    testFalcon.selectProfileSlot(0, 0);
+    testFalcon.config_kP(0, kP);
+    testFalcon.config_kD(0, kD);
+    testFalcon.configClosedLoopPeakOutput(0,1.0);
+    testFalcon.set(ControlMode.Position, TICKS_PER_REVOLUTION, DemandType.ArbitraryFeedForward, 0.5);
   }
 
   @Override
   public void autonomousPeriodic() {
-    frontRight.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
-    backLeft.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
-    frontLeft.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
-    backRight.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
+//    frontRight.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
+//    backLeft.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
+//    frontLeft.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
+//    backRight.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
+
+//    frontRight.set(ControlMode.MotionMagic, 1000);
+//    backLeft.set(ControlMode.MotionMagic, 1000);
+//    frontLeft.set(ControlMode.MotionMagic, 1000);
+//    backRight.set(ControlMode.MotionMagic, 1000);
     //driveTrain.driveCartesian(0.2, 0.0, 0.0);
-    System.out.println(backLeft.getSelectedSensorPosition());
+    System.out.println(testFalcon.getSelectedSensorPosition());
+
   }
 
   @Override
@@ -150,6 +222,23 @@ public class Robot extends TimedRobot {
       backRight.setSelectedSensorPosition(0.0);
     }
     driveTrain.driveCartesian(-xbox.getLeftY(), xbox.getLeftX(), -xbox.getRightX(), pigeon2.getAngle());
+
+    if (xbox.getBButton()) {
+      shooter.set(ControlMode.Velocity, 5000);
+    }
+    if (xbox.getBButton()) {
+      shooterHammer.set(DoubleSolenoid.Value.kForward);
+    } else {
+      shooterHammer.set(DoubleSolenoid.Value.kReverse);
+    }
+
+    if (xbox.getXButton()) {
+      killAllSolenoids();
+    }
+
+
+
+
 //    if (logitech.getR1Button()) {
 //      driveTrain.driveCartesian(0, 0.4, logitech.getRightY(), direction[0]);
 //    } else if (logitech.getL1Button()) {
@@ -157,7 +246,6 @@ public class Robot extends TimedRobot {
 //
 //    } else {
 //      driveTrain.driveCartesian(0, 0.0, logitech.getRightY(), direction[0]);
-//
 //    }
 //    frontLeft.set(logitech.getLeftX());
 //    frontRight.set(logitech.getLeftY());
@@ -184,4 +272,8 @@ public class Robot extends TimedRobot {
 
   @Override
   public void simulationPeriodic() {}
+
+  public void killAllSolenoids() {
+    shooterHammer.set(DoubleSolenoid.Value.kOff);
+  }
 }
