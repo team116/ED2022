@@ -6,6 +6,7 @@ package frc.robot;
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.DemandType;
 import com.ctre.phoenix.motorcontrol.FeedbackDevice;
+import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.can.TalonFX;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonFX;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
@@ -14,6 +15,7 @@ import com.ctre.phoenix.sensors.PigeonIMU;
 
 import com.ctre.phoenix.sensors.WPI_Pigeon2;
 import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.*;
@@ -57,6 +59,8 @@ public class Robot extends TimedRobot {
 
   WPI_TalonFX testFalcon;
 
+  PIDController pidController;
+
   PS4Controller logitech;
   XboxController xbox;
   MecanumDrive driveTrain;
@@ -73,8 +77,10 @@ public class Robot extends TimedRobot {
 
   private final double TICKS_PER_INCH = (TICKS_PER_REVOLUTION * GEAR_RATIO) / (RADIUS_OF_WHEEL * 2 * Math.PI);
 
-  private final double kP = 1.0;
-  private final double kD = 1.0;
+  // THIS WORKS FOR VELOCITY (FOR SOME REASON)
+  private final double kP = .01; //0.1
+  private final double kI = 0.001; //0.3
+  private final double kD = 1.0; // 7.0
 
   public Robot() {
     super();
@@ -93,7 +99,13 @@ public class Robot extends TimedRobot {
     frontRight = new WPI_TalonSRX(3);
     backRight = new WPI_TalonSRX(4);
 
+    backLeft.setNeutralMode(NeutralMode.Brake);
+    frontLeft.setNeutralMode(NeutralMode.Brake);
+    backRight.setNeutralMode(NeutralMode.Brake);
+    backRight.setNeutralMode(NeutralMode.Brake);
+
     testFalcon = new WPI_TalonFX(16);
+    testFalcon.setNeutralMode(NeutralMode.Brake);
 
     frontLeft.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
     backLeft.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
@@ -107,6 +119,7 @@ public class Robot extends TimedRobot {
 
     backLeft.setInverted(true);
     frontLeft.setInverted(true);
+
 
     /***
     CHANGE LOCATIONS
@@ -175,9 +188,12 @@ public class Robot extends TimedRobot {
 
     testFalcon.selectProfileSlot(0, 0);
     testFalcon.config_kP(0, kP);
+    testFalcon.config_kI(0, kI);
     testFalcon.config_kD(0, kD);
     testFalcon.configClosedLoopPeakOutput(0,1.0);
-    testFalcon.set(ControlMode.Position, TICKS_PER_REVOLUTION, DemandType.ArbitraryFeedForward, 0.5);
+    testFalcon.configPeakOutputForward(0.6);
+    //testFalcon.set(ControlMode.Position, TICKS_PER_REVOLUTION);
+    testFalcon.set(ControlMode.Velocity, 4000);
   }
 
   @Override
@@ -191,8 +207,8 @@ public class Robot extends TimedRobot {
 //    backLeft.set(ControlMode.MotionMagic, 1000);
 //    frontLeft.set(ControlMode.MotionMagic, 1000);
 //    backRight.set(ControlMode.MotionMagic, 1000);
-    //driveTrain.driveCartesian(0.2, 0.0, 0.0);
-    System.out.println(testFalcon.getSelectedSensorPosition());
+//    driveTrain.driveCartesian(0.2, 0.0, 0.0);
+    System.out.println(testFalcon.getSelectedSensorVelocity());
 
   }
 
@@ -230,6 +246,14 @@ public class Robot extends TimedRobot {
       shooterHammer.set(DoubleSolenoid.Value.kForward);
     } else {
       shooterHammer.set(DoubleSolenoid.Value.kReverse);
+    }
+
+    if (xbox.getBButton()) {
+      if (limeLight.getEntry("tx").getDouble(0) < 0) {
+        driveTrain.driveCartesian(0, 0, -0.2);
+      } else {
+        driveTrain.driveCartesian(0, 0, 0.1);
+      }
     }
 
     if (xbox.getXButton()) {
