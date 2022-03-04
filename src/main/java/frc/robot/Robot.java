@@ -29,6 +29,9 @@ public class Robot extends TimedRobot {
    * This function is run when the robot is first started up and should be used for any
    * initialization code.
    */
+  private static final boolean testBot = true;
+  private static final boolean realBot = false;
+
 
   SerialPort arduino;
 
