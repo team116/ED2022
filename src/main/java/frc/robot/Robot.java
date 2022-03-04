@@ -3,28 +3,17 @@
 // the WPILib BSD license file in the root directory of this project.
 
 package frc.robot;
-import com.ctre.phoenix.motorcontrol.ControlMode;
-import com.ctre.phoenix.motorcontrol.DemandType;
-import com.ctre.phoenix.motorcontrol.FeedbackDevice;
-import com.ctre.phoenix.motorcontrol.NeutralMode;
-import com.ctre.phoenix.motorcontrol.can.TalonFX;
+import com.ctre.phoenix.motorcontrol.*;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonFX;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
-import com.ctre.phoenix.sensors.Pigeon2;
 import com.ctre.phoenix.sensors.PigeonIMU;
 
 import com.ctre.phoenix.sensors.WPI_Pigeon2;
 import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.drive.MecanumDrive;
-import edu.wpi.first.wpilibj.motorcontrol.PWMTalonFX;
-import edu.wpi.first.wpilibj.motorcontrol.Talon;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-
-import javax.naming.ldap.Control;
 
 
 /**
@@ -48,7 +37,8 @@ public class Robot extends TimedRobot {
   WPI_TalonSRX backRight;
 
   WPI_TalonSRX intake;
-  DoubleSolenoid intakeRelease;
+  DoubleSolenoid leftIntakeRelease;
+  DoubleSolenoid rightIntakeRelease;
 
   WPI_TalonFX shooter;
 
@@ -56,6 +46,9 @@ public class Robot extends TimedRobot {
 
   WPI_TalonFX leftClimber;
   WPI_TalonFX rightClimber;
+
+  DoubleSolenoid leftClimberRelease;
+  DoubleSolenoid rightClimberRelease;
 
   WPI_TalonFX testFalcon;
 
@@ -66,6 +59,8 @@ public class Robot extends TimedRobot {
   MecanumDrive driveTrain;
 
   NetworkTable limeLight;
+
+  private int step = 0;
 
   double[] direction = {0.0, 0.0, 0.0};
 
@@ -78,9 +73,16 @@ public class Robot extends TimedRobot {
   private final double TICKS_PER_INCH = (TICKS_PER_REVOLUTION * GEAR_RATIO) / (RADIUS_OF_WHEEL * 2 * Math.PI);
 
   // THIS WORKS FOR VELOCITY (FOR SOME REASON)
-  private final double kP = .01; //0.1
-  private final double kI = 0.001; //0.3
-  private final double kD = 1.0; // 7.0
+  private final double SHOOTER_kP = .01;
+  private final double SHOOTER_kI = 0.001;
+  private final double SHOOTER_kD = 1.0;
+
+  // for Falcons
+  private final double DRIVETRAIN_kP  = 1.0;
+  private final double DRIVETRAIN_kI = 0.001;
+  private final double DRIVETRAIN_kD = 1.0;
+
+  Timer timer;
 
   public Robot() {
     super();
@@ -125,11 +127,35 @@ public class Robot extends TimedRobot {
     CHANGE LOCATIONS
      */
     shooter = new WPI_TalonFX(5);
+//    shooterHammer = new DoubleSolenoid(PneumaticsModuleType.REVPH, 2, 11);
+
+    intake = new WPI_TalonSRX(6);
+//    leftIntakeRelease = new DoubleSolenoid(PneumaticsModuleType.REVPH, 0, 13);
+//    rightIntakeRelease = new DoubleSolenoid(PneumaticsModuleType.REVPH, 1, 12);
+
+    leftClimber = new WPI_TalonFX(7);
+    rightClimber = new WPI_TalonFX(8);
+
+//    leftClimberRelease = new DoubleSolenoid(PneumaticsModuleType.REVPH, 3, 10);
+//    rightClimberRelease = new DoubleSolenoid(PneumaticsModuleType.REVPH, 4, 9);
+
+    shooter.configSelectedFeedbackSensor(FeedbackDevice.IntegratedSensor);
+    shooter.setSelectedSensorPosition(0.0);
+
+    shooter.selectProfileSlot(0, 0);
+    shooter.config_kP(0, SHOOTER_kP);
+    shooter.config_kI(0, SHOOTER_kI);
+    shooter.config_kD(0, SHOOTER_kD);
+    shooter.configClosedLoopPeakOutput(0,1.0);
+    // shooter.configPeakOutputForward(0.6);
+
+    shooter.set(TalonFXControlMode.Velocity, 0.0);
+    
+
 
     pigeon = new PigeonIMU(12);
     pigeon.configFactoryDefault();
     pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
-    //driveTrain = new MecanumDrive(frontLeft, backLeft, frontRight, backRight);
 
     pigeon.getYawPitchRoll(direction);
     pigeon2 = new WPI_Pigeon2(12);
@@ -144,10 +170,6 @@ public class Robot extends TimedRobot {
       }
     }
 
-    //shooterHammer = new DoubleSolenoid(PneumaticsModuleType.CTREPCM, 0, 1 );
-
-    shooter.set(ControlMode.Velocity, 0.0);
-
     limeLight = NetworkTableInstance.getDefault().getTable("limelight");
   }
 
@@ -156,6 +178,11 @@ public class Robot extends TimedRobot {
 
   @Override
   public void autonomousInit() {
+
+    frontLeft.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
+    backLeft.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
+    frontRight.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
+    backRight.configSelectedFeedbackSensor(FeedbackDevice.QuadEncoder);
 
     frontLeft.setSensorPhase(true);
     backLeft.setSensorPhase(true);
@@ -178,38 +205,108 @@ public class Robot extends TimedRobot {
     backRight.selectProfileSlot(0,0);
     frontRight.selectProfileSlot(0,0);
 
-    backLeft.config_kP(0, kP);
-    frontLeft.config_kP(0, kP);
-    backRight.config_kP(0, kP);
-    frontRight.config_kP(0, kP);
+    backLeft.config_kP(0, DRIVETRAIN_kP);
+    frontLeft.config_kP(0, DRIVETRAIN_kP);
+    backRight.config_kP(0, DRIVETRAIN_kP);
+    frontRight.config_kP(0, DRIVETRAIN_kP);
+
+    backLeft.config_kI(0, DRIVETRAIN_kI);
+    frontLeft.config_kI(0, DRIVETRAIN_kI);
+    backRight.config_kI(0, DRIVETRAIN_kI);
+    frontRight.config_kI(0, DRIVETRAIN_kI);
+
+    backLeft.config_kD(0, DRIVETRAIN_kD);
+    frontLeft.config_kD(0, DRIVETRAIN_kD);
+    backRight.config_kD(0, DRIVETRAIN_kD);
+    frontRight.config_kD(0, DRIVETRAIN_kD);
+
+    backLeft.configPeakOutputForward(0.6);
+    frontLeft.configPeakOutputForward(0.6);
+    backRight.configPeakOutputForward(0.6);
+    frontRight.configPeakOutputForward(0.6);
+
+    backLeft.set(ControlMode.Position, 0.0);
+    frontLeft.set(ControlMode.Position, 0.0);
+    backRight.set(ControlMode.Position, 0.0);
+    frontRight.set(ControlMode.Position, 0.0);
 
     testFalcon.configSelectedFeedbackSensor(FeedbackDevice.IntegratedSensor);
     testFalcon.setSelectedSensorPosition(0.0);
 
     testFalcon.selectProfileSlot(0, 0);
-    testFalcon.config_kP(0, kP);
-    testFalcon.config_kI(0, kI);
-    testFalcon.config_kD(0, kD);
+    testFalcon.config_kP(0, DRIVETRAIN_kP);
+    testFalcon.config_kI(0, DRIVETRAIN_kI);
+    testFalcon.config_kD(0, DRIVETRAIN_kD);
     testFalcon.configClosedLoopPeakOutput(0,1.0);
     testFalcon.configPeakOutputForward(0.6);
     //testFalcon.set(ControlMode.Position, TICKS_PER_REVOLUTION);
-    testFalcon.set(ControlMode.Velocity, 4000);
+    //testFalcon.set(ControlMode.Velocity, 4000);
+
+    step = 0;
+    pigeon2.reset();
+
+    timer = new Timer();
+    timer.start();
   }
 
   @Override
   public void autonomousPeriodic() {
-//    frontRight.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
-//    backLeft.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
-//    frontLeft.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
-//    backRight.set(ControlMode.MotionMagic, 1000, DemandType.AuxPID, 0.2);
 
-//    frontRight.set(ControlMode.MotionMagic, 1000);
-//    backLeft.set(ControlMode.MotionMagic, 1000);
-//    frontLeft.set(ControlMode.MotionMagic, 1000);
-//    backRight.set(ControlMode.MotionMagic, 1000);
-//    driveTrain.driveCartesian(0.2, 0.0, 0.0);
-    System.out.println(testFalcon.getSelectedSensorVelocity());
+    switch (step) {
+      case 0:
+        backLeft.set(ControlMode.Position, 1000.0);
+        frontLeft.set(ControlMode.Position, 1000.0);
+        backRight.set(ControlMode.Position, 1000.0);
+        frontRight.set(ControlMode.Position, 1000.0);
+//        testFalcon.set(ControlMode.Position, TICKS_PER_REVOLUTION);
 
+        if (timer.get() >= 5.0) {
+          backLeft.set(ControlMode.PercentOutput, 0.0);
+          frontLeft.set(ControlMode.PercentOutput, 0.0);
+          backRight.set(ControlMode.PercentOutput, 0.0);
+          frontRight.set(ControlMode.PercentOutput, 0.0);
+          step++;
+        }
+        break;
+      case 1:
+        if (Math.abs(pigeon2.getAngle() % 360) < 180) {
+          backLeft.set(ControlMode.PercentOutput, 0.5);
+          frontLeft.set(ControlMode.PercentOutput, 0.5);
+          backRight.set(ControlMode.PercentOutput, -0.5);
+          frontRight.set(ControlMode.PercentOutput, -0.5);
+        } else {
+          backLeft.set(ControlMode.PercentOutput, 0.0);
+          frontLeft.set(ControlMode.PercentOutput, 0.0);
+          backRight.set(ControlMode.PercentOutput, 0.0);
+          frontRight.set(ControlMode.PercentOutput, 0.0);
+          step++;
+        }
+
+        break;
+      case 2:
+        backLeft.set(ControlMode.Position, 0.0);
+        frontLeft.set(ControlMode.Position, 0.0);
+        backRight.set(ControlMode.Position, 0.0);
+        frontRight.set(ControlMode.Position, 0.0);
+//        testFalcon.set(ControlMode.Position, TICKS_PER_REVOLUTION);
+
+        if (timer.get() >= 5.0) {
+          backLeft.set(ControlMode.PercentOutput, 0.0);
+          frontLeft.set(ControlMode.PercentOutput, 0.0);
+          backRight.set(ControlMode.PercentOutput, 0.0);
+          frontRight.set(ControlMode.PercentOutput, 0.0);
+          step++;
+        }
+        break;
+      default:
+        System.out.println("STOOOOOPID");
+        break;
+    }
+    System.out.printf("Front Left: %f, Front Right: %f, Back Left: %f, Back Right: %f %n",
+            frontLeft.getSelectedSensorPosition(), frontRight.getSelectedSensorPosition(),backLeft.getSelectedSensorPosition(),backRight.getSelectedSensorPosition());
+    System.out.println("Pigeon: " + pigeon2.getAngle());
+//    System.out.println(testFalcon.getSelectedSensorVelocity());
+//    System.out.println(testFalcon.getSelectedSensorPosition());
   }
 
   @Override
@@ -220,6 +317,8 @@ public class Robot extends TimedRobot {
     pigeon.configFactoryDefault();
     pigeon2.reset();
     frontLeft.setSelectedSensorPosition(0.0);
+    driveTrain = new MecanumDrive(frontLeft, backLeft, frontRight, backRight);
+
   }
 
   @Override
@@ -242,6 +341,7 @@ public class Robot extends TimedRobot {
     if (xbox.getBButton()) {
       shooter.set(ControlMode.Velocity, 5000);
     }
+
     if (xbox.getBButton()) {
       shooterHammer.set(DoubleSolenoid.Value.kForward);
     } else {
@@ -256,25 +356,43 @@ public class Robot extends TimedRobot {
       }
     }
 
+    if (xbox.getBButton()) {
+      intake.set(ControlMode.PercentOutput, 0.3);
+    }
+
+    if (xbox.getBButton()) {
+      leftIntakeRelease.set(DoubleSolenoid.Value.kForward);
+      rightIntakeRelease.set(DoubleSolenoid.Value.kForward);
+    } else {
+      leftIntakeRelease.set(DoubleSolenoid.Value.kReverse);
+      rightIntakeRelease.set(DoubleSolenoid.Value.kReverse);
+    }
+
+    if (xbox.getBButton()) {
+      leftClimber.set(TalonFXControlMode.PercentOutput, 0.5);
+      rightClimber.set(TalonFXControlMode.PercentOutput, -0.5);
+    } else if (xbox.getBButton()) {
+      leftClimber.set(TalonFXControlMode.PercentOutput, -0.5);
+      rightClimber.set(TalonFXControlMode.PercentOutput, 0.5);
+    } else {
+      leftClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+      rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+    }
+
+    if (xbox.getBButton()) {
+      rightClimberRelease.set(DoubleSolenoid.Value.kForward);
+      leftClimberRelease.set(DoubleSolenoid.Value.kForward);
+    } else {
+      rightClimberRelease.set(DoubleSolenoid.Value.kReverse);
+      leftClimberRelease.set(DoubleSolenoid.Value.kReverse);
+    }
+
     if (xbox.getXButton()) {
       killAllSolenoids();
     }
 
 
 
-
-//    if (logitech.getR1Button()) {
-//      driveTrain.driveCartesian(0, 0.4, logitech.getRightY(), direction[0]);
-//    } else if (logitech.getL1Button()) {
-//      driveTrain.driveCartesian(0, -0.4, logitech.getRightY(), direction[0]);
-//
-//    } else {
-//      driveTrain.driveCartesian(0, 0.0, logitech.getRightY(), direction[0]);
-//    }
-//    frontLeft.set(logitech.getLeftX());
-//    frontRight.set(logitech.getLeftY());
-//    backLeft.set(logitech.getRightX());
-//    backRight.set(logitech.getRightY());
   }
 
   @Override
@@ -299,5 +417,39 @@ public class Robot extends TimedRobot {
 
   public void killAllSolenoids() {
     shooterHammer.set(DoubleSolenoid.Value.kOff);
+    leftIntakeRelease.set(DoubleSolenoid.Value.kOff);
+    rightIntakeRelease.set(DoubleSolenoid.Value.kOff);
+    rightClimberRelease.set(DoubleSolenoid.Value.kOff);
+    leftClimberRelease.set(DoubleSolenoid.Value.kOff);
+  }
+
+  public void runToInchesForTime(double inches, double time) {
+    backLeft.set(ControlMode.Position, TICKS_PER_INCH * inches);
+    frontLeft.set(ControlMode.Position, TICKS_PER_INCH * inches);
+    backRight.set(ControlMode.Position, TICKS_PER_INCH * inches);
+    frontRight.set(ControlMode.Position, TICKS_PER_INCH * inches);
+
+    if (timer.get() >= time) {
+      backLeft.set(ControlMode.PercentOutput, 0.0);
+      frontLeft.set(ControlMode.PercentOutput, 0.0);
+      backRight.set(ControlMode.PercentOutput, 0.0);
+      frontRight.set(ControlMode.PercentOutput, 0.0);
+      step++;
+    }
+  }
+
+  public void turnToDegreesAtSpeed(double degrees, double speed) {
+    if (Math.abs(pigeon2.getAngle() % 360) < degrees) {
+      backLeft.set(ControlMode.PercentOutput, speed);
+      frontLeft.set(ControlMode.PercentOutput, speed);
+      backRight.set(ControlMode.PercentOutput, -speed);
+      frontRight.set(ControlMode.PercentOutput, -speed);
+    } else {
+      backLeft.set(ControlMode.PercentOutput, 0.0);
+      frontLeft.set(ControlMode.PercentOutput, 0.0);
+      backRight.set(ControlMode.PercentOutput, 0.0);
+      frontRight.set(ControlMode.PercentOutput, 0.0);
+      step++;
+    }
   }
 }
