@@ -14,6 +14,8 @@ import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.drive.MecanumDrive;
+import edu.wpi.first.wpilibj.simulation.JoystickSim;
+import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 
 
 /**
@@ -56,6 +58,16 @@ public class Robot extends TimedRobot {
 
   PS4Controller logitech;
   XboxController xbox;
+  Joystick joystick;
+
+  JoystickButton aimBot;
+  JoystickButton climberForward;
+  JoystickButton climberBackward;
+  JoystickButton climberRelease;
+
+  boolean climberIsReleased;
+  boolean climberReleasePreviouslyPressed;
+
   MecanumDrive driveTrain;
 
   NetworkTable limeLight;
@@ -150,8 +162,6 @@ public class Robot extends TimedRobot {
     // shooter.configPeakOutputForward(0.6);
 
     shooter.set(TalonFXControlMode.Velocity, 0.0);
-    
-
 
     pigeon = new PigeonIMU(12);
     pigeon.configFactoryDefault();
@@ -313,6 +323,9 @@ public class Robot extends TimedRobot {
   public void teleopInit() {
     logitech = new PS4Controller(0);
     xbox = new XboxController(0);
+    joystick = new Joystick(1);
+    aimBot = new JoystickButton(joystick, 0);
+
     pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
     pigeon.configFactoryDefault();
     pigeon2.reset();
@@ -338,17 +351,17 @@ public class Robot extends TimedRobot {
     }
     driveTrain.driveCartesian(-xbox.getLeftY(), xbox.getLeftX(), -xbox.getRightX(), pigeon2.getAngle());
 
-    if (xbox.getBButton()) {
-      shooter.set(ControlMode.Velocity, 5000);
+    if (joystick.getTriggerPressed()) {
+      shooter.set(ControlMode.Velocity, joystick.getMagnitude());
     }
 
-    if (xbox.getBButton()) {
+    if (joystick.getTopPressed()) {
       shooterHammer.set(DoubleSolenoid.Value.kForward);
     } else {
       shooterHammer.set(DoubleSolenoid.Value.kReverse);
     }
 
-    if (xbox.getBButton()) {
+    if (aimBot.get()) {
       if (limeLight.getEntry("tx").getDouble(0) < 0) {
         driveTrain.driveCartesian(0, 0, -0.2);
       } else {
@@ -360,7 +373,7 @@ public class Robot extends TimedRobot {
       intake.set(ControlMode.PercentOutput, 0.3);
     }
 
-    if (xbox.getBButton()) {
+    if (xbox.getXButton()) {
       leftIntakeRelease.set(DoubleSolenoid.Value.kForward);
       rightIntakeRelease.set(DoubleSolenoid.Value.kForward);
     } else {
@@ -368,10 +381,10 @@ public class Robot extends TimedRobot {
       rightIntakeRelease.set(DoubleSolenoid.Value.kReverse);
     }
 
-    if (xbox.getBButton()) {
+    if (climberForward.get()) {
       leftClimber.set(TalonFXControlMode.PercentOutput, 0.5);
       rightClimber.set(TalonFXControlMode.PercentOutput, -0.5);
-    } else if (xbox.getBButton()) {
+    } else if (climberBackward.get()) {
       leftClimber.set(TalonFXControlMode.PercentOutput, -0.5);
       rightClimber.set(TalonFXControlMode.PercentOutput, 0.5);
     } else {
@@ -379,7 +392,15 @@ public class Robot extends TimedRobot {
       rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
     }
 
-    if (xbox.getBButton()) {
+    boolean climberReleasedisBeingPressed = climberRelease.get();
+
+    if (climberReleasedisBeingPressed && !climberReleasePreviouslyPressed) {
+      climberIsReleased = !climberIsReleased;
+    }
+
+    climberReleasePreviouslyPressed = climberReleasedisBeingPressed;
+
+    if (climberIsReleased) {
       rightClimberRelease.set(DoubleSolenoid.Value.kForward);
       leftClimberRelease.set(DoubleSolenoid.Value.kForward);
     } else {
@@ -387,7 +408,7 @@ public class Robot extends TimedRobot {
       leftClimberRelease.set(DoubleSolenoid.Value.kReverse);
     }
 
-    if (xbox.getXButton()) {
+    if (xbox.getLeftBumper()) {
       killAllSolenoids();
     }
 
