@@ -14,8 +14,8 @@ import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.drive.MecanumDrive;
-import edu.wpi.first.wpilibj.simulation.JoystickSim;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
+import edu.wpi.first.wpilibj2.command.button.POVButton;
 
 
 /**
@@ -64,7 +64,15 @@ public class Robot extends TimedRobot {
   Joystick joystick;
 
   JoystickButton aimBot;
-  JoystickButton climberForward;
+  POVButton joystickPOV_0;
+  POVButton joystickPOV_45;
+  POVButton joystickPOV_90;
+  POVButton joystickPOV_135;
+  POVButton joystickPOV_180;
+  POVButton joystickPOV_225;
+  POVButton joystickPOV_270;
+  POVButton joystickPOV_315;
+  JoystickButton joystickButton4;
   JoystickButton climberBackward;
   JoystickButton climberRelease;
 
@@ -267,49 +275,49 @@ public class Robot extends TimedRobot {
 
     switch (step) {
       case 0:
-        backLeft.set(ControlMode.Position, 1000.0);
-        frontLeft.set(ControlMode.Position, 1000.0);
-        backRight.set(ControlMode.Position, 1000.0);
-        frontRight.set(ControlMode.Position, 1000.0);
-//        testFalcon.set(ControlMode.Position, TICKS_PER_REVOLUTION);
+        rightIntakeRelease.set(DoubleSolenoid.Value.kForward);
+        leftIntakeRelease.set(DoubleSolenoid.Value.kForward);
+        step++;
+        timer.reset();
 
-        if (timer.get() >= 5.0) {
-          backLeft.set(ControlMode.PercentOutput, 0.0);
-          frontLeft.set(ControlMode.PercentOutput, 0.0);
-          backRight.set(ControlMode.PercentOutput, 0.0);
-          frontRight.set(ControlMode.PercentOutput, 0.0);
-          step++;
-        }
         break;
+
       case 1:
-        if (Math.abs(pigeon2.getAngle() % 360) < 180) {
-          backLeft.set(ControlMode.PercentOutput, 0.5);
-          frontLeft.set(ControlMode.PercentOutput, 0.5);
-          backRight.set(ControlMode.PercentOutput, -0.5);
-          frontRight.set(ControlMode.PercentOutput, -0.5);
-        } else {
-          backLeft.set(ControlMode.PercentOutput, 0.0);
-          frontLeft.set(ControlMode.PercentOutput, 0.0);
-          backRight.set(ControlMode.PercentOutput, 0.0);
-          frontRight.set(ControlMode.PercentOutput, 0.0);
-          step++;
-        }
-
+        runToInchesForTime(36, 5.0);
         break;
-      case 2:
-        backLeft.set(ControlMode.Position, 0.0);
-        frontLeft.set(ControlMode.Position, 0.0);
-        backRight.set(ControlMode.Position, 0.0);
-        frontRight.set(ControlMode.Position, 0.0);
-//        testFalcon.set(ControlMode.Position, TICKS_PER_REVOLUTION);
 
-        if (timer.get() >= 5.0) {
-          backLeft.set(ControlMode.PercentOutput, 0.0);
-          frontLeft.set(ControlMode.PercentOutput, 0.0);
-          backRight.set(ControlMode.PercentOutput, 0.0);
-          frontRight.set(ControlMode.PercentOutput, 0.0);
+      case 2:
+        turnToDegreesAtSpeed(180, 0.2);
+        break;
+
+      case 3:
+        shooter.set(TalonFXControlMode.Velocity, 5000);
+        if (timer.get() > 5.0) {
           step++;
+          timer.reset();
         }
+        break;
+
+      case 4:
+        shooterHammer.set(DoubleSolenoid.Value.kForward);
+        if (timer.get() > 1.0) {
+          step++;
+          shooterHammer.set(DoubleSolenoid.Value.kReverse);
+          timer.reset();
+        }
+        break;
+
+      case 5:
+        shooterHammer.set(DoubleSolenoid.Value.kForward);
+        if (timer.get() > 1.00) {
+          step++;
+          shooterHammer.set(DoubleSolenoid.Value.kReverse);
+          timer.reset();
+        }
+        break;
+
+      case 6:
+
         break;
       default:
         System.out.println("STOOOOOPID");
@@ -326,8 +334,20 @@ public class Robot extends TimedRobot {
   public void teleopInit() {
     logitech = new PS4Controller(0);
     xbox = new XboxController(0);
-    joystick = new Joystick(1);
-    aimBot = new JoystickButton(joystick, 0);
+    joystick = new Joystick(0);
+    joystickPOV_0 = new POVButton(joystick, 0);
+    joystickPOV_45 = new POVButton(joystick, 45);
+    joystickPOV_90 = new POVButton(joystick, 90);
+    joystickPOV_135 = new POVButton(joystick, 135);
+    joystickPOV_180 = new POVButton(joystick, 180);
+    joystickPOV_225 = new POVButton(joystick, 225);
+    joystickPOV_270 = new POVButton(joystick, 270);
+    joystickPOV_315 = new POVButton(joystick, 315);
+
+    joystickButton4 = new JoystickButton(joystick, 4);
+    climberBackward = new JoystickButton(joystick, 9);
+
+    climberRelease = new JoystickButton(joystick, 3);
 
     pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
     pigeon.configFactoryDefault();
@@ -341,30 +361,19 @@ public class Robot extends TimedRobot {
   public void teleopPeriodic() {
     pigeon.getYawPitchRoll(direction);
 
-
-    System.out.println("yaw " + pigeon2.getAngle());
-    System.out.printf("Front Left: %f, Front Right: %f, Back Left: %f, Back Right: %f %n",
-            frontLeft.getSelectedSensorPosition(), frontRight.getSelectedSensorPosition(),backLeft.getSelectedSensorPosition(),backRight.getSelectedSensorPosition());
-
-    if (xbox.getAButtonPressed()) {
-      frontLeft.setSelectedSensorPosition(0.0);
-      backLeft.setSelectedSensorPosition(0.0);
-      frontRight.setSelectedSensorPosition(0.0);
-      backRight.setSelectedSensorPosition(0.0);
-    }
     driveTrain.driveCartesian(-xbox.getLeftY(), xbox.getLeftX(), -xbox.getRightX(), pigeon2.getAngle());
 
     if (joystick.getTriggerPressed()) {
       shooter.set(ControlMode.Velocity, joystick.getMagnitude());
     }
 
-    if (joystick.getTopPressed()) {
+    if (joystickButton4.get()) {
       shooterHammer.set(DoubleSolenoid.Value.kForward);
     } else {
       shooterHammer.set(DoubleSolenoid.Value.kReverse);
     }
 
-    if (aimBot.get()) {
+    if (joystick.getTop()) {
       if (limeLight.getEntry("tx").getDouble(0) < 0) {
         driveTrain.driveCartesian(0, 0, -0.2);
       } else {
@@ -384,10 +393,10 @@ public class Robot extends TimedRobot {
       rightIntakeRelease.set(DoubleSolenoid.Value.kReverse);
     }
 
-    if (climberForward.get()) {
+    if (joystickPOV_315.get() || joystickPOV_0.get() || joystickPOV_45.get()) {
       leftClimber.set(TalonFXControlMode.PercentOutput, 0.5);
       rightClimber.set(TalonFXControlMode.PercentOutput, -0.5);
-    } else if (climberBackward.get()) {
+    } else if (joystickPOV_90.get() || joystickPOV_225.get() || joystickPOV_270.get()) {
       leftClimber.set(TalonFXControlMode.PercentOutput, -0.5);
       rightClimber.set(TalonFXControlMode.PercentOutput, 0.5);
     } else {
@@ -414,7 +423,6 @@ public class Robot extends TimedRobot {
     if (xbox.getLeftBumper()) {
       killAllSolenoids();
     }
-
 
 
   }
