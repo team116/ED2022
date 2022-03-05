@@ -25,6 +25,7 @@ import edu.wpi.first.wpilibj2.command.button.POVButton;
  * project.
  */
 public class Robot extends TimedRobot {
+  public static final boolean IS_REAL_ROBOT = false;
   /**
    * This function is run when the robot is first started up and should be used for any
    * initialization code.
@@ -32,6 +33,19 @@ public class Robot extends TimedRobot {
   private static final boolean testBot = true;
   private static final boolean realBot = false;
 
+  private static final PneumaticsModuleType PNEUMATICS_MODULE_TYPE =
+        IS_REAL_ROBOT ? PneumaticsModuleType.REVPH : PneumaticsModuleType.CTREPCM;
+
+  private static final int SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL = 2;
+  private static final int SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL = IS_REAL_ROBOT ? 11 : 5;
+  private static final int LEFT_INTAKE_RELEASE_FORWARD_CHANNEL = 0;
+  private static final int LEFT_INTAKE_RELEASE_REVERSE_CHANNEL = IS_REAL_ROBOT ? 13 : 7;
+  private static final int RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL = 1;
+  private static final int RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL = IS_REAL_ROBOT ? 12 : 6;
+  private static final int LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL = 3;
+  private static final int LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL = 10;
+  private static final int RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL = 4;
+  private static final int RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL = 9;
 
   SerialPort arduino;
 
@@ -124,6 +138,13 @@ public class Robot extends TimedRobot {
     frontRight = new WPI_TalonSRX(3);
     backRight = new WPI_TalonSRX(4);
 
+    if (! IS_REAL_ROBOT) {
+      backLeft.setExpiration(0.3);
+      frontLeft.setExpiration(0.3);
+      frontRight.setExpiration(0.3);
+      backRight.setExpiration(0.3);
+    }
+
     backLeft.setNeutralMode(NeutralMode.Brake);
     frontLeft.setNeutralMode(NeutralMode.Brake);
     backRight.setNeutralMode(NeutralMode.Brake);
@@ -146,21 +167,26 @@ public class Robot extends TimedRobot {
     frontLeft.setInverted(true);
 
 
-    /***
+    /*
     CHANGE LOCATIONS
      */
     shooter = new WPI_TalonFX(5);
-//    shooterHammer = new DoubleSolenoid(PneumaticsModuleType.REVPH, 2, 11);
+    //shooterHammer = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
+    shooterHammer = createDoubleSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
 
     intake = new WPI_TalonSRX(6);
-//    leftIntakeRelease = new DoubleSolenoid(PneumaticsModuleType.REVPH, 0, 13);
-//    rightIntakeRelease = new DoubleSolenoid(PneumaticsModuleType.REVPH, 1, 12);
+    //leftIntakeRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, LEFT_INTAKE_RELEASE_FORWARD_CHANNEL, LEFT_INTAKE_RELEASE_REVERSE_CHANNEL);
+    //rightIntakeRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL, RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL);
+    leftIntakeRelease = createDoubleSolenoid(LEFT_INTAKE_RELEASE_FORWARD_CHANNEL, LEFT_INTAKE_RELEASE_REVERSE_CHANNEL);
+    rightIntakeRelease = createDoubleSolenoid(RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL, RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL);
 
     leftClimber = new WPI_TalonFX(7);
     rightClimber = new WPI_TalonFX(8);
 
-//    leftClimberRelease = new DoubleSolenoid(PneumaticsModuleType.REVPH, 3, 10);
-//    rightClimberRelease = new DoubleSolenoid(PneumaticsModuleType.REVPH, 4, 9);
+    if (IS_REAL_ROBOT) {
+      leftClimberRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL);
+      rightClimberRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL);
+    }
 
     shooter.configSelectedFeedbackSensor(FeedbackDevice.IntegratedSensor);
     shooter.setSelectedSensorPosition(0.0);
@@ -412,12 +438,14 @@ public class Robot extends TimedRobot {
 
     climberReleasePreviouslyPressed = climberReleasedisBeingPressed;
 
-    if (climberIsReleased) {
-      rightClimberRelease.set(DoubleSolenoid.Value.kForward);
-      leftClimberRelease.set(DoubleSolenoid.Value.kForward);
-    } else {
-      rightClimberRelease.set(DoubleSolenoid.Value.kReverse);
-      leftClimberRelease.set(DoubleSolenoid.Value.kReverse);
+    if (IS_REAL_ROBOT) {
+      if (climberIsReleased) {
+        rightClimberRelease.set(DoubleSolenoid.Value.kForward);
+        leftClimberRelease.set(DoubleSolenoid.Value.kForward);
+      } else {
+        rightClimberRelease.set(DoubleSolenoid.Value.kReverse);
+        leftClimberRelease.set(DoubleSolenoid.Value.kReverse);
+      }
     }
 
     if (xbox.getLeftBumper()) {
@@ -451,8 +479,11 @@ public class Robot extends TimedRobot {
     shooterHammer.set(DoubleSolenoid.Value.kOff);
     leftIntakeRelease.set(DoubleSolenoid.Value.kOff);
     rightIntakeRelease.set(DoubleSolenoid.Value.kOff);
-    rightClimberRelease.set(DoubleSolenoid.Value.kOff);
-    leftClimberRelease.set(DoubleSolenoid.Value.kOff);
+
+    if (IS_REAL_ROBOT) {
+      rightClimberRelease.set(DoubleSolenoid.Value.kOff);
+      leftClimberRelease.set(DoubleSolenoid.Value.kOff);
+    }
   }
 
   public void runToInchesForTime(double inches, double time) {
@@ -483,5 +514,13 @@ public class Robot extends TimedRobot {
       frontRight.set(ControlMode.PercentOutput, 0.0);
       step++;
     }
+  }
+
+  private static DoubleSolenoid createDoubleSolenoid(int forwardChannel, int reverseChannel) {
+    if (IS_REAL_ROBOT) {
+      return new DoubleSolenoid(PneumaticsModuleType.REVPH, forwardChannel, reverseChannel);
+    }
+
+    return new DoubleSolenoid(15, PneumaticsModuleType.CTREPCM, forwardChannel, reverseChannel);
   }
 }
