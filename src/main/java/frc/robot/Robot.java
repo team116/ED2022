@@ -14,6 +14,8 @@ import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.drive.MecanumDrive;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 import edu.wpi.first.wpilibj2.command.button.POVButton;
 
@@ -71,6 +73,8 @@ public class Robot extends TimedRobot {
 
   WPI_TalonFX testFalcon;
 
+  WPI_TalonFX shooterHoodAdjustment;
+
   PIDController pidController;
 
   PS4Controller logitech;
@@ -89,9 +93,14 @@ public class Robot extends TimedRobot {
   JoystickButton joystickButton4;
   JoystickButton climberBackward;
   JoystickButton climberRelease;
+  JoystickButton joystickButton11;
+  JoystickButton joystickButton12;
 
   boolean climberIsReleased;
   boolean climberReleasePreviouslyPressed;
+
+  boolean intakeIsReleased;
+  boolean intakeReleasePreviouslyPressed;
 
   MecanumDrive driveTrain;
 
@@ -120,6 +129,16 @@ public class Robot extends TimedRobot {
   private final double DRIVETRAIN_kD = 1.0;
 
   Timer timer;
+
+  enum Play {
+    DRIVE_BACK_GET_TWO_BALLS,
+    DO_NOTHING,
+    DRIVE_BACK
+  }
+
+  SendableChooser<Play> play = new SendableChooser<>();
+
+  Play chosenPlay;
 
   public Robot() {
     super();
@@ -188,6 +207,8 @@ public class Robot extends TimedRobot {
       rightClimberRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL);
     }
 
+    shooterHoodAdjustment = new WPI_TalonFX(9);
+
     shooter.configSelectedFeedbackSensor(FeedbackDevice.IntegratedSensor);
     shooter.setSelectedSensorPosition(0.0);
 
@@ -217,7 +238,13 @@ public class Robot extends TimedRobot {
       }
     }
 
-    limeLight = NetworkTableInstance.getDefault().getTable("limelight");
+    limeLight = NetworkTableInstance.getDefault().getTable("limelight-ed");
+
+    play.setDefaultOption("Do Nothing", Play.DO_NOTHING);
+    play.addOption("Do Nothing", Play.DO_NOTHING);
+    play.addOption("Drive Back", Play.DRIVE_BACK);
+    play.addOption("Drive Back and Shoot 2 Balls", Play.DRIVE_BACK_GET_TWO_BALLS);
+    SmartDashboard.putData(play);
   }
 
   @Override
@@ -294,61 +321,86 @@ public class Robot extends TimedRobot {
 
     timer = new Timer();
     timer.start();
+    chosenPlay = play.getSelected();
   }
 
   @Override
   public void autonomousPeriodic() {
-
-    switch (step) {
-      case 0:
-        rightIntakeRelease.set(DoubleSolenoid.Value.kForward);
-        leftIntakeRelease.set(DoubleSolenoid.Value.kForward);
-        step++;
-        timer.reset();
-
+    switch (chosenPlay) {
+      case DO_NOTHING:
         break;
 
-      case 1:
-        runToInchesForTime(36, 5.0);
-        break;
+      case DRIVE_BACK:
 
-      case 2:
-        turnToDegreesAtSpeed(180, 0.2);
-        break;
+        switch (step) {
+          case 0:
+            rightIntakeRelease.set(DoubleSolenoid.Value.kForward);
+            leftIntakeRelease.set(DoubleSolenoid.Value.kForward);
+            step++;
+            timer.reset();
+            break;
 
-      case 3:
-        shooter.set(TalonFXControlMode.Velocity, 5000);
-        if (timer.get() > 5.0) {
-          step++;
-          timer.reset();
+          case 1:
+            runToInchesForTime(36, 5.0);
+            break;
         }
         break;
 
-      case 4:
-        shooterHammer.set(DoubleSolenoid.Value.kForward);
-        if (timer.get() > 1.0) {
-          step++;
-          shooterHammer.set(DoubleSolenoid.Value.kReverse);
-          timer.reset();
-        }
-        break;
+      case DRIVE_BACK_GET_TWO_BALLS:
 
-      case 5:
-        shooterHammer.set(DoubleSolenoid.Value.kForward);
-        if (timer.get() > 1.00) {
-          step++;
-          shooterHammer.set(DoubleSolenoid.Value.kReverse);
-          timer.reset();
-        }
-        break;
+        switch (step) {
+          case 0:
+            rightIntakeRelease.set(DoubleSolenoid.Value.kForward);
+            leftIntakeRelease.set(DoubleSolenoid.Value.kForward);
+            step++;
+            timer.reset();
 
-      case 6:
+            break;
 
-        break;
-      default:
-        System.out.println("STOOOOOPID");
-        break;
+          case 1:
+            runToInchesForTime(36, 5.0);
+            break;
+
+          case 2:
+            turnToDegreesAtSpeed(180, 0.2);
+            break;
+
+          case 3:
+            shooter.set(TalonFXControlMode.Velocity, 5000);
+            if (timer.get() > 5.0) {
+              step++;
+              timer.reset();
+            }
+            break;
+
+          case 4:
+            shooterHammer.set(DoubleSolenoid.Value.kForward);
+            if (timer.get() > 1.0) {
+              step++;
+              shooterHammer.set(DoubleSolenoid.Value.kReverse);
+              timer.reset();
+            }
+            break;
+
+          case 5:
+            shooterHammer.set(DoubleSolenoid.Value.kForward);
+            if (timer.get() > 1.00) {
+              step++;
+              shooterHammer.set(DoubleSolenoid.Value.kReverse);
+              timer.reset();
+            }
+            break;
+
+          case 6:
+
+            break;
+          default:
+            System.out.println("STOOOOOPID");
+            break;
+      }
+      break;
     }
+
     System.out.printf("Front Left: %f, Front Right: %f, Back Left: %f, Back Right: %f %n",
             frontLeft.getSelectedSensorPosition(), frontRight.getSelectedSensorPosition(),backLeft.getSelectedSensorPosition(),backRight.getSelectedSensorPosition());
     System.out.println("Pigeon: " + pigeon2.getAngle());
@@ -360,7 +412,7 @@ public class Robot extends TimedRobot {
   public void teleopInit() {
     logitech = new PS4Controller(0);
     xbox = new XboxController(0);
-    joystick = new Joystick(0);
+    joystick = new Joystick(1);
     joystickPOV_0 = new POVButton(joystick, 0);
     joystickPOV_45 = new POVButton(joystick, 45);
     joystickPOV_90 = new POVButton(joystick, 90);
@@ -373,6 +425,9 @@ public class Robot extends TimedRobot {
     joystickButton4 = new JoystickButton(joystick, 4);
     climberBackward = new JoystickButton(joystick, 9);
 
+    joystickButton11 = new JoystickButton(joystick, 11);
+    joystickButton12 = new JoystickButton(joystick, 12);
+
     climberRelease = new JoystickButton(joystick, 3);
 
     pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
@@ -380,17 +435,16 @@ public class Robot extends TimedRobot {
     pigeon2.reset();
     frontLeft.setSelectedSensorPosition(0.0);
     driveTrain = new MecanumDrive(frontLeft, backLeft, frontRight, backRight);
-
+    limeLight.getEntry("pipeline").setNumber(0);
   }
 
   @Override
   public void teleopPeriodic() {
-    pigeon.getYawPitchRoll(direction);
 
-    driveTrain.driveCartesian(-xbox.getLeftY(), xbox.getLeftX(), -xbox.getRightX(), pigeon2.getAngle());
-
-    if (joystick.getTriggerPressed()) {
-      shooter.set(ControlMode.Velocity, joystick.getMagnitude());
+    if (joystick.getTriggerPressed() && rightIntakeRelease.get() != DoubleSolenoid.Value.kForward) {
+      shooter.set(ControlMode.Velocity, 130000*(joystick.getThrottle()+1)/2);
+    } else if (joystick.getTop() && joystick.getTriggerPressed() && rightIntakeRelease.get() != DoubleSolenoid.Value.kForward){
+      shooter.set(ControlMode.Velocity, findShooterVelocity(findDistanceToHub(limeLight.getEntry("ty").getDouble(0))));
     }
 
     if (joystickButton4.get()) {
@@ -400,18 +454,24 @@ public class Robot extends TimedRobot {
     }
 
     if (joystick.getTop()) {
-      if (limeLight.getEntry("tx").getDouble(0) < 0) {
-        driveTrain.driveCartesian(0, 0, -0.2);
-      } else {
-        driveTrain.driveCartesian(0, 0, 0.1);
-      }
+      driveTrain.driveCartesian(0, 0, -limeLight.getEntry("tx").getDouble(0)/45);
+    } else {
+      driveTrain.driveCartesian(-xbox.getLeftY(), xbox.getLeftX(), -xbox.getRightX(), pigeon2.getAngle());
     }
 
     if (xbox.getBButton()) {
       intake.set(ControlMode.PercentOutput, 0.3);
     }
 
-    if (xbox.getXButton()) {
+    boolean intakeReleasedIsBeingPressed = xbox.getXButton();
+
+    if (intakeReleasedIsBeingPressed && !intakeReleasePreviouslyPressed) {
+      intakeIsReleased = !intakeIsReleased;
+    }
+
+    intakeReleasePreviouslyPressed = intakeReleasedIsBeingPressed;
+
+    if (intakeIsReleased) {
       leftIntakeRelease.set(DoubleSolenoid.Value.kForward);
       rightIntakeRelease.set(DoubleSolenoid.Value.kForward);
     } else {
@@ -430,13 +490,13 @@ public class Robot extends TimedRobot {
       rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
     }
 
-    boolean climberReleasedisBeingPressed = climberRelease.get();
+    boolean climberReleasedIsBeingPressed = climberRelease.get();
 
-    if (climberReleasedisBeingPressed && !climberReleasePreviouslyPressed) {
+    if (climberReleasedIsBeingPressed && !climberReleasePreviouslyPressed) {
       climberIsReleased = !climberIsReleased;
     }
 
-    climberReleasePreviouslyPressed = climberReleasedisBeingPressed;
+    climberReleasePreviouslyPressed = climberReleasedIsBeingPressed;
 
     if (IS_REAL_ROBOT) {
       if (climberIsReleased) {
@@ -448,11 +508,17 @@ public class Robot extends TimedRobot {
       }
     }
 
+    if (joystickButton12.get()) {
+      shooterHoodAdjustment.set(TalonFXControlMode.PercentOutput, 0.2);
+    } else if (joystickButton11.get()) {
+      shooterHoodAdjustment.set(TalonFXControlMode.PercentOutput, -0.2);
+    } else {
+      shooterHoodAdjustment.set(TalonFXControlMode.PercentOutput, 0.0);
+    }
+
     if (xbox.getLeftBumper()) {
       killAllSolenoids();
     }
-
-
   }
 
   @Override
@@ -475,7 +541,7 @@ public class Robot extends TimedRobot {
   @Override
   public void simulationPeriodic() {}
 
-  public void killAllSolenoids() {
+  private void killAllSolenoids() {
     shooterHammer.set(DoubleSolenoid.Value.kOff);
     leftIntakeRelease.set(DoubleSolenoid.Value.kOff);
     rightIntakeRelease.set(DoubleSolenoid.Value.kOff);
@@ -486,7 +552,7 @@ public class Robot extends TimedRobot {
     }
   }
 
-  public void runToInchesForTime(double inches, double time) {
+  private void runToInchesForTime(double inches, double time) {
     backLeft.set(ControlMode.Position, TICKS_PER_INCH * inches);
     frontLeft.set(ControlMode.Position, TICKS_PER_INCH * inches);
     backRight.set(ControlMode.Position, TICKS_PER_INCH * inches);
@@ -501,7 +567,7 @@ public class Robot extends TimedRobot {
     }
   }
 
-  public void turnToDegreesAtSpeed(double degrees, double speed) {
+  private void turnToDegreesAtSpeed(double degrees, double speed) {
     if (Math.abs(pigeon2.getAngle() % 360) < degrees) {
       backLeft.set(ControlMode.PercentOutput, speed);
       frontLeft.set(ControlMode.PercentOutput, speed);
@@ -522,5 +588,18 @@ public class Robot extends TimedRobot {
     }
 
     return new DoubleSolenoid(15, PneumaticsModuleType.CTREPCM, forwardChannel, reverseChannel);
+  }
+
+  private double findDistanceToHub(double limelightAngle) {
+    return 67.5/Math.atan(40+limelightAngle);
+  }
+
+  private double findShooterVelocity(double distanceToHub) {
+    // numberz, math, pain
+    return Math.sqrt(((9.8*distanceToHub)/41.056)*((9.8*distanceToHub)/41.056) + 1685);
+  }
+
+  private double findShooterAngle(double distanceToHub) {
+    return Math.atan(1685/(9.8*distanceToHub));
   }
 }
