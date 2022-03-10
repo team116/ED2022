@@ -32,9 +32,6 @@ public class Robot extends TimedRobot {
    * This function is run when the robot is first started up and should be used for any
    * initialization code.
    */
-  private static final boolean testBot = true;
-  private static final boolean realBot = false;
-
   private static final PneumaticsModuleType PNEUMATICS_MODULE_TYPE =
         IS_REAL_ROBOT ? PneumaticsModuleType.REVPH : PneumaticsModuleType.CTREPCM;
 
@@ -128,6 +125,21 @@ public class Robot extends TimedRobot {
   private final double DRIVETRAIN_kI = 0.001;
   private final double DRIVETRAIN_kD = 1.0;
 
+  // CAN bus IDs
+  private final int LEFT_FRONT_ID = 1;
+  private final int LEFT_REAR_ID = 2;
+  private final int RIGHT_FRONT_ID = 3;
+  private final int RIGHT_REAR_ID = 4;
+  private final int INTAKE_ID = 5;
+  private final int SHOOTER_ID = 6;
+  private final int WINCH_RIGHT_ID = 7;
+  private final int WINCH_FOLLOWER_ID = 8;
+  private final int SHOOTER_HOOD_ID = 9;
+  private final int PIDGEON_ID = 12;
+//  private final int PDP_ID = 14;
+//  private final int PCM_ID = 15;
+
+
   Timer timer;
 
   enum Play {
@@ -152,10 +164,10 @@ public class Robot extends TimedRobot {
   public void robotInit() {
     // Ports based on CAN id, found through phoenix tuner and running the diagnostic server
 
-    backLeft = new WPI_TalonSRX(2);
-    frontLeft = new WPI_TalonSRX(1);
-    frontRight = new WPI_TalonSRX(3);
-    backRight = new WPI_TalonSRX(4);
+    backLeft = new WPI_TalonSRX(LEFT_REAR_ID);
+    frontLeft = new WPI_TalonSRX(LEFT_FRONT_ID);
+    frontRight = new WPI_TalonSRX(RIGHT_FRONT_ID);
+    backRight = new WPI_TalonSRX(RIGHT_REAR_ID);
 
     if (! IS_REAL_ROBOT) {
       backLeft.setExpiration(0.3);
@@ -189,25 +201,25 @@ public class Robot extends TimedRobot {
     /*
     CHANGE LOCATIONS
      */
-    shooter = new WPI_TalonFX(5);
+    shooter = new WPI_TalonFX(SHOOTER_ID);
     //shooterHammer = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
     shooterHammer = createDoubleSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
 
-    intake = new WPI_TalonSRX(6);
+    intake = new WPI_TalonSRX(INTAKE_ID);
     //leftIntakeRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, LEFT_INTAKE_RELEASE_FORWARD_CHANNEL, LEFT_INTAKE_RELEASE_REVERSE_CHANNEL);
     //rightIntakeRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL, RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL);
     leftIntakeRelease = createDoubleSolenoid(LEFT_INTAKE_RELEASE_FORWARD_CHANNEL, LEFT_INTAKE_RELEASE_REVERSE_CHANNEL);
     rightIntakeRelease = createDoubleSolenoid(RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL, RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL);
 
-    leftClimber = new WPI_TalonFX(7);
-    rightClimber = new WPI_TalonFX(8);
+    leftClimber = new WPI_TalonFX(WINCH_RIGHT_ID);
+    rightClimber = new WPI_TalonFX(WINCH_FOLLOWER_ID);
 
     if (IS_REAL_ROBOT) {
       leftClimberRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL);
       rightClimberRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL);
     }
 
-    shooterHoodAdjustment = new WPI_TalonFX(9);
+    shooterHoodAdjustment = new WPI_TalonFX(SHOOTER_HOOD_ID);
 
     shooter.configSelectedFeedbackSensor(FeedbackDevice.IntegratedSensor);
     shooter.setSelectedSensorPosition(0.0);
@@ -221,12 +233,12 @@ public class Robot extends TimedRobot {
 
     shooter.set(TalonFXControlMode.Velocity, 0.0);
 
-    pigeon = new PigeonIMU(12);
+    pigeon = new PigeonIMU(PIDGEON_ID);
     pigeon.configFactoryDefault();
     pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
 
     pigeon.getYawPitchRoll(direction);
-    pigeon2 = new WPI_Pigeon2(12);
+    pigeon2 = new WPI_Pigeon2(PIDGEON_ID);
     try {
       arduino = new SerialPort(115200, SerialPort.Port.kUSB);
     } catch (Exception exception){
