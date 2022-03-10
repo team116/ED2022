@@ -72,13 +72,10 @@ public class Robot extends TimedRobot {
 
   WPI_TalonFX shooterHoodAdjustment;
 
-  PIDController pidController;
-
   PS4Controller logitech;
   XboxController xbox;
   Joystick joystick;
 
-  JoystickButton aimBot;
   POVButton joystickPOV_0;
   POVButton joystickPOV_45;
   POVButton joystickPOV_90;
@@ -213,6 +210,9 @@ public class Robot extends TimedRobot {
 
     leftClimber = new WPI_TalonFX(WINCH_RIGHT_ID);
     rightClimber = new WPI_TalonFX(WINCH_FOLLOWER_ID);
+
+    leftClimber.follow(rightClimber);
+    leftClimber.setInverted(true);
 
     if (IS_REAL_ROBOT) {
       leftClimberRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL);
@@ -492,13 +492,13 @@ public class Robot extends TimedRobot {
     }
 
     if (joystickPOV_315.get() || joystickPOV_0.get() || joystickPOV_45.get()) {
-      leftClimber.set(TalonFXControlMode.PercentOutput, 0.5);
+
       rightClimber.set(TalonFXControlMode.PercentOutput, -0.5);
     } else if (joystickPOV_90.get() || joystickPOV_225.get() || joystickPOV_270.get()) {
-      leftClimber.set(TalonFXControlMode.PercentOutput, -0.5);
+
       rightClimber.set(TalonFXControlMode.PercentOutput, 0.5);
     } else {
-      leftClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+
       rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
     }
 
@@ -608,10 +608,10 @@ public class Robot extends TimedRobot {
 
   private double findShooterVelocity(double distanceToHub) {
     // numberz, math, pain
-    return Math.sqrt(((9.8*distanceToHub)/41.056)*((9.8*distanceToHub)/41.056) + 1685);
+    return Math.sqrt(((9.8*distanceToHub)/41.056)*((9.8*distanceToHub)/41.056) + 1685)/(4*Math.PI);
   }
 
   private double findShooterAngle(double distanceToHub) {
-    return Math.atan(1685/(9.8*distanceToHub));
+    return 60*Math.atan(1685/(9.8*distanceToHub));
   }
 }
