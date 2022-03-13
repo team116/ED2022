@@ -9,7 +9,6 @@ import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 import com.ctre.phoenix.sensors.PigeonIMU;
 
 import com.ctre.phoenix.sensors.WPI_Pigeon2;
-import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.*;
@@ -27,7 +26,7 @@ import edu.wpi.first.wpilibj2.command.button.POVButton;
  * project.
  */
 public class Robot extends TimedRobot {
-  public static final boolean IS_REAL_ROBOT = false;
+  public static final boolean IS_REAL_ROBOT = true;
   /**
    * This function is run when the robot is first started up and should be used for any
    * initialization code.
@@ -47,6 +46,8 @@ public class Robot extends TimedRobot {
   private static final int RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL = 9;
 
   SerialPort arduino;
+
+  Compressor compressor;
 
   PigeonIMU pigeon;
   WPI_TalonSRX backLeft;
@@ -114,7 +115,7 @@ public class Robot extends TimedRobot {
 
   // THIS WORKS FOR VELOCITY (FOR SOME REASON)
   private final double SHOOTER_kP = .01;
-  private final double SHOOTER_kI = 0.001;
+  private final double SHOOTER_kI = 0.00001;
   private final double SHOOTER_kD = 1.0;
 
   // for Falcons
@@ -134,7 +135,7 @@ public class Robot extends TimedRobot {
   private final int SHOOTER_HOOD_ID = 9;
   private final int PIDGEON_ID = 12;
 //  private final int PDP_ID = 14;
-//  private final int PCM_ID = 15;
+  private final int PCM_ID = 15;
 
 
   Timer timer;
@@ -160,6 +161,9 @@ public class Robot extends TimedRobot {
   @Override
   public void robotInit() {
     // Ports based on CAN id, found through phoenix tuner and running the diagnostic server
+//
+//    compressor = new Compressor(PCM_ID, PneumaticsModuleType.REVPH);
+//    compressor.enableAnalog(0, 120);
 
     backLeft = new WPI_TalonSRX(LEFT_REAR_ID);
     frontLeft = new WPI_TalonSRX(LEFT_FRONT_ID);
@@ -205,8 +209,8 @@ public class Robot extends TimedRobot {
     intake = new WPI_TalonSRX(INTAKE_ID);
     //leftIntakeRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, LEFT_INTAKE_RELEASE_FORWARD_CHANNEL, LEFT_INTAKE_RELEASE_REVERSE_CHANNEL);
     //rightIntakeRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL, RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL);
-    leftIntakeRelease = createDoubleSolenoid(LEFT_INTAKE_RELEASE_FORWARD_CHANNEL, LEFT_INTAKE_RELEASE_REVERSE_CHANNEL);
-    rightIntakeRelease = createDoubleSolenoid(RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL, RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL);
+//    leftIntakeRelease = createDoubleSolenoid(LEFT_INTAKE_RELEASE_FORWARD_CHANNEL, LEFT_INTAKE_RELEASE_REVERSE_CHANNEL);
+//    rightIntakeRelease = createDoubleSolenoid(RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL, RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL);
 
     leftClimber = new WPI_TalonFX(WINCH_RIGHT_ID);
     rightClimber = new WPI_TalonFX(WINCH_FOLLOWER_ID);
@@ -215,8 +219,8 @@ public class Robot extends TimedRobot {
     leftClimber.setInverted(true);
 
     if (IS_REAL_ROBOT) {
-      leftClimberRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL);
-      rightClimberRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL);
+//      leftClimberRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL);
+//      rightClimberRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL);
     }
 
     shooterHoodAdjustment = new WPI_TalonFX(SHOOTER_HOOD_ID);
@@ -453,10 +457,13 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopPeriodic() {
 
-    if (joystick.getTriggerPressed() && rightIntakeRelease.get() != DoubleSolenoid.Value.kForward) {
-      shooter.set(ControlMode.Velocity, 130000*(joystick.getThrottle()+1)/2);
+    if (joystick.getTriggerPressed() /*&& rightIntakeRelease.get() == DoubleSolenoid.Value.kForward*/) {
+      //shooter.set(ControlMode.Velocity, 13000*(joystick.getThrottle()+1)/2);
+      shooter.set(ControlMode.PercentOutput, (joystick.getThrottle()+1)/2);
     } else if (joystick.getTop() && joystick.getTriggerPressed() && rightIntakeRelease.get() != DoubleSolenoid.Value.kForward){
       shooter.set(ControlMode.Velocity, findShooterVelocity(findDistanceToHub(limeLight.getEntry("ty").getDouble(0))));
+    } else {
+      shooter.set(TalonFXControlMode.Velocity, 0.0);
     }
 
     if (joystickButton4.get()) {
@@ -466,13 +473,15 @@ public class Robot extends TimedRobot {
     }
 
     if (joystick.getTop()) {
-      driveTrain.driveCartesian(0, 0, -limeLight.getEntry("tx").getDouble(0)/45);
+      driveTrain.driveCartesian(0, 0, -limeLight.getEntry("tx").getDouble(0)/60);
     } else {
-      driveTrain.driveCartesian(-xbox.getLeftY(), xbox.getLeftX(), -xbox.getRightX(), pigeon2.getAngle());
+      driveTrain.driveCartesian(applyDeadBandAndShape(xbox.getLeftY()), applyDeadBandAndShape(xbox.getLeftX()), applyDeadBandAndShape( -xbox.getRightX()), pigeon2.getAngle());
     }
 
     if (xbox.getBButton()) {
-      intake.set(ControlMode.PercentOutput, 0.3);
+      intake.set(ControlMode.PercentOutput, 1.0);
+    } else {
+      intake.set(TalonSRXControlMode.PercentOutput, 0.0);
     }
 
     boolean intakeReleasedIsBeingPressed = xbox.getXButton();
@@ -482,14 +491,14 @@ public class Robot extends TimedRobot {
     }
 
     intakeReleasePreviouslyPressed = intakeReleasedIsBeingPressed;
-
-    if (intakeIsReleased) {
-      leftIntakeRelease.set(DoubleSolenoid.Value.kForward);
-      rightIntakeRelease.set(DoubleSolenoid.Value.kForward);
-    } else {
-      leftIntakeRelease.set(DoubleSolenoid.Value.kReverse);
-      rightIntakeRelease.set(DoubleSolenoid.Value.kReverse);
-    }
+//
+//    if (intakeIsReleased) {
+//      leftIntakeRelease.set(DoubleSolenoid.Value.kForward);
+//      rightIntakeRelease.set(DoubleSolenoid.Value.kForward);
+//    } else {
+//      leftIntakeRelease.set(DoubleSolenoid.Value.kReverse);
+//      rightIntakeRelease.set(DoubleSolenoid.Value.kReverse);
+//    }
 
     if (joystickPOV_315.get() || joystickPOV_0.get() || joystickPOV_45.get()) {
 
@@ -510,15 +519,15 @@ public class Robot extends TimedRobot {
 
     climberReleasePreviouslyPressed = climberReleasedIsBeingPressed;
 
-    if (IS_REAL_ROBOT) {
-      if (climberIsReleased) {
-        rightClimberRelease.set(DoubleSolenoid.Value.kForward);
-        leftClimberRelease.set(DoubleSolenoid.Value.kForward);
-      } else {
-        rightClimberRelease.set(DoubleSolenoid.Value.kReverse);
-        leftClimberRelease.set(DoubleSolenoid.Value.kReverse);
-      }
-    }
+//    if (IS_REAL_ROBOT) {
+//      if (climberIsReleased) {
+//        rightClimberRelease.set(DoubleSolenoid.Value.kForward);
+//        leftClimberRelease.set(DoubleSolenoid.Value.kForward);
+//      } else {
+//        rightClimberRelease.set(DoubleSolenoid.Value.kReverse);
+//        leftClimberRelease.set(DoubleSolenoid.Value.kReverse);
+//      }
+//    }
 
     if (joystickButton12.get()) {
       shooterHoodAdjustment.set(TalonFXControlMode.PercentOutput, 0.2);
@@ -531,6 +540,8 @@ public class Robot extends TimedRobot {
     if (xbox.getLeftBumper()) {
       killAllSolenoids();
     }
+
+    System.out.println(shooter.getSelectedSensorVelocity());
   }
 
   @Override
@@ -540,11 +551,13 @@ public class Robot extends TimedRobot {
   public void disabledPeriodic() {}
 
   @Override
-  public void testInit() {}
+  public void testInit() {
+    compressor.disable();
+  }
 
   @Override
   public void testPeriodic() {
-    System.out.println(arduino.readString());
+    //System.out.println(arduino.readString());
   }
 
   @Override
@@ -598,7 +611,6 @@ public class Robot extends TimedRobot {
     if (IS_REAL_ROBOT) {
       return new DoubleSolenoid(PneumaticsModuleType.REVPH, forwardChannel, reverseChannel);
     }
-
     return new DoubleSolenoid(15, PneumaticsModuleType.CTREPCM, forwardChannel, reverseChannel);
   }
 
@@ -608,10 +620,18 @@ public class Robot extends TimedRobot {
 
   private double findShooterVelocity(double distanceToHub) {
     // numberz, math, pain
-    return Math.sqrt(((9.8*distanceToHub)/41.056)*((9.8*distanceToHub)/41.056) + 1685)/(4*Math.PI);
+    return Math.sqrt(((9.81*distanceToHub)/41.056)*((9.81*distanceToHub)/41.056) + 1685)/(4*Math.PI);
   }
 
   private double findShooterAngle(double distanceToHub) {
     return 60*Math.atan(1685/(9.8*distanceToHub));
+  }
+
+  private double applyDeadBandAndShape(double value) {
+    if (value < 0.1) {
+      return 0.0;
+    } else {
+      return value * value * value;
+    }
   }
 }
