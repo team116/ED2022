@@ -10,7 +10,6 @@ import com.ctre.phoenix.sensors.PigeonIMU;
 
 import com.ctre.phoenix.sensors.WPI_Pigeon2;
 import edu.wpi.first.networktables.NetworkTable;
-import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.drive.MecanumDrive;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
@@ -26,7 +25,7 @@ import edu.wpi.first.wpilibj2.command.button.POVButton;
  * project.
  */
 public class Robot extends TimedRobot {
-  public static final boolean IS_REAL_ROBOT = false;
+  public static final boolean IS_REAL_ROBOT = true;
   /**
    * This function is run when the robot is first started up and should be used for any
    * initialization code.
@@ -35,17 +34,19 @@ public class Robot extends TimedRobot {
         IS_REAL_ROBOT ? PneumaticsModuleType.REVPH : PneumaticsModuleType.CTREPCM;
 
   private static final int SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL = 2;
-  private static final int SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL = IS_REAL_ROBOT ? 11 : 5;
-  private static final int LEFT_INTAKE_RELEASE_FORWARD_CHANNEL = 0;
-  private static final int LEFT_INTAKE_RELEASE_REVERSE_CHANNEL = IS_REAL_ROBOT ? 13 : 7;
-  private static final int RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL = 1;
-  private static final int RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL = IS_REAL_ROBOT ? 12 : 6;
-  private static final int LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL = 3;
-  private static final int LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL = 10;
-  private static final int RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL = 4;
-  private static final int RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL = 9;
+  private static final int SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL = IS_REAL_ROBOT ? 10 : 5;
+  private static final int INTAKE_RELEASE_FORWARD_CHANNEL = 1;
+  private static final int INTAKE_RELEASE_REVERSE_CHANNEL = IS_REAL_ROBOT ? 9 : 7;
+  private static final int FIRST_SPARE_CHANNEL = 0;
+  private static final int SECOND_SPARE_CHANNEL = IS_REAL_ROBOT ? 8 : 6;
+  private static final int LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL = 4;
+  private static final int LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL = 12;
+  private static final int RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL = 3;
+  private static final int RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL = 11;
 
   SerialPort arduino;
+
+  PneumaticHub pH;
 
   Compressor compressor;
 
@@ -56,8 +57,7 @@ public class Robot extends TimedRobot {
   WPI_TalonSRX backRight;
 
   WPI_TalonSRX intake;
-  DoubleSolenoid leftIntakeRelease;
-  DoubleSolenoid rightIntakeRelease;
+  DoubleSolenoid intakeRelease;
 
   WPI_TalonFX shooter;
 
@@ -162,9 +162,14 @@ public class Robot extends TimedRobot {
   @Override
   public void robotInit() {
     // Ports based on CAN id, found through phoenix tuner and running the diagnostic server
+    if (IS_REAL_ROBOT) {
+      pH = new PneumaticHub(PCM_ID);
+//
+      compressor = new Compressor(PCM_ID, PneumaticsModuleType.REVPH);
 
-    compressor = new Compressor(PCM_ID, PneumaticsModuleType.REVPH);
-    compressor.enableAnalog(0, 120);
+      System.out.println("Has Enabled Analog Compressor");
+      System.out.println(pH.getModuleNumber());
+    }
 
     backLeft = new WPI_TalonSRX(LEFT_REAR_ID);
     frontLeft = new WPI_TalonSRX(LEFT_FRONT_ID);
@@ -204,21 +209,20 @@ public class Robot extends TimedRobot {
     CHANGE LOCATIONS
      */
     shooter = new WPI_TalonFX(SHOOTER_ID);
-//    //shooterHammer = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
-    shooterHammer = createDoubleSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
-//
+    shooterHammer = pH.makeDoubleSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
+//    shooterHammer = createDoubleSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
+
     intake = new WPI_TalonSRX(INTAKE_ID);
-    //leftIntakeRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, LEFT_INTAKE_RELEASE_FORWARD_CHANNEL, LEFT_INTAKE_RELEASE_REVERSE_CHANNEL);
-    //rightIntakeRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL, RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL);
-    leftIntakeRelease = createDoubleSolenoid(LEFT_INTAKE_RELEASE_FORWARD_CHANNEL, LEFT_INTAKE_RELEASE_REVERSE_CHANNEL);
-    rightIntakeRelease = createDoubleSolenoid(RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL, RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL);
+    intakeRelease = pH.makeDoubleSolenoid( INTAKE_RELEASE_FORWARD_CHANNEL, INTAKE_RELEASE_REVERSE_CHANNEL);
+//    leftIntakeRelease = createDoubleSolenoid(LEFT_INTAKE_RELEASE_FORWARD_CHANNEL, LEFT_INTAKE_RELEASE_REVERSE_CHANNEL);
+//    rightIntakeRelease = createDoubleSolenoid(RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL, RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL);
 
     leftClimber = new WPI_TalonFX(WINCH_RIGHT_ID);
     rightClimber = new WPI_TalonFX(WINCH_FOLLOWER_ID);
 
     if (IS_REAL_ROBOT) {
-      leftClimberRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL);
-      rightClimberRelease = new DoubleSolenoid(PNEUMATICS_MODULE_TYPE, RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL);
+      leftClimberRelease = pH.makeDoubleSolenoid(LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL);
+      rightClimberRelease = pH.makeDoubleSolenoid(RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL);
     }
 
     shooterHoodAdjustment = new WPI_TalonFX(SHOOTER_HOOD_ID);
@@ -238,7 +242,7 @@ public class Robot extends TimedRobot {
 //    pigeon.configFactoryDefault();
 //    pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
 
-    pigeon.getYawPitchRoll(direction);
+//    pigeon.getYawPitchRoll(direction);
     pigeon2 = new WPI_Pigeon2(PIDGEON_ID);
 //    try {
 //      arduino = new SerialPort(115200, SerialPort.Port.kUSB);
@@ -262,7 +266,10 @@ public class Robot extends TimedRobot {
   }
 
   @Override
-  public void robotPeriodic() {}
+  public void robotPeriodic() {
+
+
+  }
 
   @Override
   public void autonomousInit() {
@@ -349,8 +356,8 @@ public class Robot extends TimedRobot {
 
         switch (step) {
           case 0:
-            rightIntakeRelease.set(DoubleSolenoid.Value.kForward);
-            leftIntakeRelease.set(DoubleSolenoid.Value.kForward);
+
+            intakeRelease.set(DoubleSolenoid.Value.kForward);
             step++;
             timer.reset();
             break;
@@ -377,8 +384,8 @@ public class Robot extends TimedRobot {
 
         switch (step) {
           case 0:
-            rightIntakeRelease.set(DoubleSolenoid.Value.kForward);
-            leftIntakeRelease.set(DoubleSolenoid.Value.kForward);
+
+            intakeRelease.set(DoubleSolenoid.Value.kForward);
             step++;
             timer.reset();
 
@@ -428,7 +435,7 @@ public class Robot extends TimedRobot {
       case TEST:
         switch (step) {
           case 0:
-            testFalcon.set(ControlMode.Velocity, 6380 * 2048/600);
+            testFalcon.set(TalonFXControlMode.Velocity, 6380 * 2048/600);
             //step++;
             break;
           case 1:
@@ -436,8 +443,8 @@ public class Robot extends TimedRobot {
         }
         break;
     }
-    System.out.println(chosenPlay);
-    //System.out.printf("Front Left: %f, Front Right: %f, Back Left: %f, Back Right: %f %n",
+//    System.out.println(chosenPlay);
+//    System.out.printf("Front Left: %f, Front Right: %f, Back Left: %f, Back Right: %f %n",
 //            frontLeft.getSelectedSensorPosition(), frontRight.getSelectedSensorPosition(),backLeft.getSelectedSensorPosition(),backRight.getSelectedSensorPosition());
 //    System.out.println("Pigeon: " + pigeon2.getAngle());
     System.out.println(testFalcon.getSelectedSensorVelocity()*600/2048);
@@ -472,29 +479,37 @@ public class Robot extends TimedRobot {
     pigeon2.reset();
     frontLeft.setSelectedSensorPosition(0.0);
     driveTrain = new MecanumDrive(frontLeft, backLeft, frontRight, backRight);
-    limeLight.getEntry("pipeline").setNumber(0);
-
+    //limeLight.getEntry("pipeline").setNumber(0);
 
   }
 
   @Override
   public void teleopPeriodic() {
+    compressor.enableAnalog(100, 120);
 
     if (joystick.getTriggerPressed() /*&& rightIntakeRelease.get() == DoubleSolenoid.Value.kForward*/) {
       //shooter.set(ControlMode.Velocity, 13000*(joystick.getThrottle()+1)/2);
       shooter.set(ControlMode.PercentOutput, (joystick.getThrottle()+1)/2);
-    } else if (joystick.getTop() && joystick.getTriggerPressed() && rightIntakeRelease.get() != DoubleSolenoid.Value.kForward){
-      shooter.set(ControlMode.Velocity, findShooterVelocity(findDistanceToHub(limeLight.getEntry("ty").getDouble(0))));
+    } else if (joystick.getTop() && joystick.getTriggerPressed()){
+//      shooter.set(ControlMode.Velocity, findShooterVelocity(findDistanceToHub(limeLight.getEntry("ty").getDouble(0))));
     } else {
       shooter.set(TalonFXControlMode.Velocity, 0.0);
     }
 
     if (joystickButton4.get()) {
-      shooterHammer.set(DoubleSolenoid.Value.kOff);
-      shooterHammer.set(DoubleSolenoid.Value.kForward);
+//      if (shooterHammer.get() != DoubleSolenoid.Value.kOff) {
+//        shooterHammer.set(DoubleSolenoid.Value.kOff);
+//      }
+      if (shooterHammer.get() != DoubleSolenoid.Value.kForward) {
+        shooterHammer.set(DoubleSolenoid.Value.kForward);
+      }
     } else {
-      shooterHammer.set(DoubleSolenoid.Value.kOff);
-      shooterHammer.set(DoubleSolenoid.Value.kReverse);
+//      if (shooterHammer.get() != DoubleSolenoid.Value.kOff) {
+//        shooterHammer.set(DoubleSolenoid.Value.kOff);
+//      }
+      if (shooterHammer.get() != DoubleSolenoid.Value.kReverse) {
+        shooterHammer.set(DoubleSolenoid.Value.kReverse);
+      }
     }
 
     if (joystick.getTop()) {
@@ -520,15 +535,17 @@ public class Robot extends TimedRobot {
     intakeReleasePreviouslyPressed = intakeReleasedIsBeingPressed;
 
     if (intakeIsReleased) {
-      leftIntakeRelease.set(DoubleSolenoid.Value.kOff);
-      rightIntakeRelease.set(DoubleSolenoid.Value.kOff);
-      leftIntakeRelease.set(DoubleSolenoid.Value.kForward);
-      rightIntakeRelease.set(DoubleSolenoid.Value.kForward);
+//      leftIntakeRelease.set(DoubleSolenoid.Value.kOff);
+//      rightIntakeRelease.set(DoubleSolenoid.Value.kOff);
+      if (intakeRelease.get() != DoubleSolenoid.Value.kForward) {
+        intakeRelease.set(DoubleSolenoid.Value.kForward);
+      }
     } else {
-      leftIntakeRelease.set(DoubleSolenoid.Value.kOff);
-      rightIntakeRelease.set(DoubleSolenoid.Value.kOff);
-      leftIntakeRelease.set(DoubleSolenoid.Value.kReverse);
-      rightIntakeRelease.set(DoubleSolenoid.Value.kReverse);
+//      leftIntakeRelease.set(DoubleSolenoid.Value.kOff);
+//      rightIntakeRelease.set(DoubleSolenoid.Value.kOff);
+      if (intakeRelease.get() != DoubleSolenoid.Value.kReverse) {
+        intakeRelease.set(DoubleSolenoid.Value.kReverse);
+      }
     }
 
     if (joystickPOV_315.get() || joystickPOV_0.get() || joystickPOV_45.get()) {
@@ -552,15 +569,19 @@ public class Robot extends TimedRobot {
 
     if (IS_REAL_ROBOT) {
       if (climberIsReleased) {
-        rightClimberRelease.set(DoubleSolenoid.Value.kOff);
-        leftClimberRelease.set(DoubleSolenoid.Value.kOff);
-        rightClimberRelease.set(DoubleSolenoid.Value.kForward);
-        leftClimberRelease.set(DoubleSolenoid.Value.kForward);
+//        rightClimberRelease.set(DoubleSolenoid.Value.kOff);
+//        leftClimberRelease.set(DoubleSolenoid.Value.kOff);
+        if (rightClimberRelease.get() != DoubleSolenoid.Value.kForward) {
+          rightClimberRelease.set(DoubleSolenoid.Value.kForward);
+          leftClimberRelease.set(DoubleSolenoid.Value.kForward);
+        }
       } else {
-        rightClimberRelease.set(DoubleSolenoid.Value.kOff);
-        leftClimberRelease.set(DoubleSolenoid.Value.kOff);
-        rightClimberRelease.set(DoubleSolenoid.Value.kReverse);
-        leftClimberRelease.set(DoubleSolenoid.Value.kReverse);
+//        rightClimberRelease.set(DoubleSolenoid.Value.kOff);
+//        leftClimberRelease.set(DoubleSolenoid.Value.kOff);
+        if (rightClimberRelease.get() != DoubleSolenoid.Value.kReverse) {
+          rightClimberRelease.set(DoubleSolenoid.Value.kReverse);
+          leftClimberRelease.set(DoubleSolenoid.Value.kReverse);
+        }
       }
     }
 
@@ -606,19 +627,18 @@ public class Robot extends TimedRobot {
   @Override
   public void testPeriodic() {
 
-    if (joystickPOV_315.get() || joystickPOV_0.get() || joystickPOV_45.get()) {
-      System.out.printf("45: %b\n 315: %b\n0: %b\n", joystickPOV_45.get(), joystickPOV_315.get(), joystickPOV_0.get());
-//      rightClimber.set(TalonFXControlMode.PercentOutput, -0.5);
-    } else if (joystickPOV_180.get() || joystickPOV_225.get() || joystickPOV_135.get()) {
-      System.out.printf("90: %b\n 225: %b\n270: %b\n", joystickPOV_90.get(), joystickPOV_225.get(), joystickPOV_270.get());
-
-//      leftClimber.set(TalonFXControlMode.PercentOutput, 0.5);
-    } else {
-
-      rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
-      leftClimber.set(TalonFXControlMode.PercentOutput, 0.0);
-    }
-
+//    if (joystickPOV_315.get() || joystickPOV_0.get() || joystickPOV_45.get()) {
+//      System.out.printf("45: %b\n 315: %b\n0: %b\n", joystickPOV_45.get(), joystickPOV_315.get(), joystickPOV_0.get());
+////      rightClimber.set(TalonFXControlMode.PercentOutput, -0.5);
+//    } else if (joystickPOV_180.get() || joystickPOV_225.get() || joystickPOV_135.get()) {
+//      System.out.printf("90: %b\n 225: %b\n270: %b\n", joystickPOV_90.get(), joystickPOV_225.get(), joystickPOV_270.get());
+//
+////      leftClimber.set(TalonFXControlMode.PercentOutput, 0.5);
+//    } else {
+//
+//      rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+//      leftClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+//    }
     //System.out.println(arduino.readString());
   }
 
@@ -630,8 +650,7 @@ public class Robot extends TimedRobot {
 
   private void killAllSolenoids() {
     shooterHammer.set(DoubleSolenoid.Value.kOff);
-    leftIntakeRelease.set(DoubleSolenoid.Value.kOff);
-    rightIntakeRelease.set(DoubleSolenoid.Value.kOff);
+    intakeRelease.set(DoubleSolenoid.Value.kOff);
 
     if (IS_REAL_ROBOT) {
       rightClimberRelease.set(DoubleSolenoid.Value.kOff);
