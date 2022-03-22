@@ -57,21 +57,23 @@ public class Robot extends TimedRobot {
   WPI_TalonSRX backRight;
 
   WPI_TalonSRX intake;
-  DoubleSolenoid intakeRelease;
+  RobotSolenoid intakeRelease;
 
   WPI_TalonFX shooter;
 
-  DoubleSolenoid shooterHammer;
+  RobotSolenoid shooterHammer;
 
   WPI_TalonFX leftClimber;
   WPI_TalonFX rightClimber;
 
-  DoubleSolenoid leftClimberRelease;
-  DoubleSolenoid rightClimberRelease;
+  RobotSolenoid leftClimberRelease;
+  RobotSolenoid rightClimberRelease;
 
   WPI_TalonFX testFalcon;
 
   WPI_TalonFX shooterHoodAdjustment;
+
+  RobotSolenoid diffSolenoids[] = {rightClimberRelease, leftClimberRelease, shooterHammer, intakeRelease};
 
   PS4Controller logitech;
   XboxController xbox;
@@ -209,11 +211,13 @@ public class Robot extends TimedRobot {
     CHANGE LOCATIONS
      */
     shooter = new WPI_TalonFX(SHOOTER_ID);
-    shooterHammer = pH.makeDoubleSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
+    shooterHammer = new RobotSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL, pH);
+//    shooterHammer = pH.makeDoubleSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
 //    shooterHammer = createDoubleSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
 
     intake = new WPI_TalonSRX(INTAKE_ID);
-    intakeRelease = pH.makeDoubleSolenoid( INTAKE_RELEASE_FORWARD_CHANNEL, INTAKE_RELEASE_REVERSE_CHANNEL);
+    intakeRelease = new RobotSolenoid(INTAKE_RELEASE_FORWARD_CHANNEL, INTAKE_RELEASE_REVERSE_CHANNEL, pH);
+//    intakeRelease = pH.makeDoubleSolenoid(INTAKE_RELEASE_FORWARD_CHANNEL, INTAKE_RELEASE_REVERSE_CHANNEL);
 //    leftIntakeRelease = createDoubleSolenoid(LEFT_INTAKE_RELEASE_FORWARD_CHANNEL, LEFT_INTAKE_RELEASE_REVERSE_CHANNEL);
 //    rightIntakeRelease = createDoubleSolenoid(RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL, RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL);
 
@@ -221,8 +225,10 @@ public class Robot extends TimedRobot {
     rightClimber = new WPI_TalonFX(WINCH_FOLLOWER_ID);
 
     if (IS_REAL_ROBOT) {
-      leftClimberRelease = pH.makeDoubleSolenoid(LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL);
-      rightClimberRelease = pH.makeDoubleSolenoid(RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL);
+      leftClimberRelease = new RobotSolenoid(LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL, pH);
+      rightClimberRelease = new RobotSolenoid(RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL, pH);
+//      leftClimberRelease = pH.makeDoubleSolenoid(LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL);
+//      rightClimberRelease = pH.makeDoubleSolenoid(RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL);
     }
 
     shooterHoodAdjustment = new WPI_TalonFX(SHOOTER_HOOD_ID);
@@ -595,6 +601,9 @@ public class Robot extends TimedRobot {
 
     if (xbox.getLeftBumper()) {
       killAllSolenoids();
+    }
+    for (RobotSolenoid solenoid: diffSolenoids){
+      solenoid.checkTurnOff();
     }
 
 //    System.out.println(shooter.getSelectedSensorVelocity());
