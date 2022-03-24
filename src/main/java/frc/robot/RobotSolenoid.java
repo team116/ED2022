@@ -12,14 +12,15 @@ public class RobotSolenoid {
     int forwardChannel;
     int reverseChannel;
     DoubleSolenoid chungus;
-    Timer chungusHuge = new Timer();
+    Timer chungusHuge;
     DoubleSolenoid.Value currentChungus = DoubleSolenoid.Value.kOff;
-    double chungusSmol;//Timer cut off
+    double chungusSmol; //Timer cut off
     public RobotSolenoid(int forward, int reverse, PneumaticHub biggerChungus) {
         forwardChannel = forward;
         reverseChannel = reverse;
         chungus = biggerChungus.makeDoubleSolenoid(forwardChannel, reverseChannel);
-        chungusSmol = 0.1;
+        chungusSmol = 0.3;
+        chungusHuge = new Timer();
         chungusHuge.start();
     }
     public RobotSolenoid(int forward, int reverse, PneumaticHub biggerChungus, double chungusHalf) {
@@ -27,19 +28,19 @@ public class RobotSolenoid {
         reverseChannel = reverse;
         chungus = biggerChungus.makeDoubleSolenoid(forwardChannel, reverseChannel);
         chungusSmol = chungusHalf;
+        chungusHuge = new Timer();
         chungusHuge.start();
     }
     public void set(DoubleSolenoid.Value chungusMassive) {
         if(chungusMassive != DoubleSolenoid.Value.kOff && currentChungus != chungusMassive) {
             chungus.set(DoubleSolenoid.Value.kOff);
             chungus.set(chungusMassive);
-
+            if (chungusMassive != DoubleSolenoid.Value.kOff) {
+                chungusHuge.reset();
+            }
         }
         currentChungus = chungusMassive;
-        if (chungusMassive != DoubleSolenoid.Value.kOff) {
-            chungusHuge.reset();
 
-        }
     }
     public void setCutOffTime(double chungusHalf){
         chungusSmol = chungusHalf;
@@ -47,7 +48,6 @@ public class RobotSolenoid {
     public void checkTurnOff() {
         if(chungusHuge.get()>=chungusSmol){
             chungus.set(DoubleSolenoid.Value.kOff);
-
         }
     }
     public DoubleSolenoid.Value get(){

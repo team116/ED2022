@@ -10,6 +10,7 @@ import com.ctre.phoenix.sensors.PigeonIMU;
 
 import com.ctre.phoenix.sensors.WPI_Pigeon2;
 import edu.wpi.first.networktables.NetworkTable;
+import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.drive.MecanumDrive;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
@@ -34,11 +35,11 @@ public class Robot extends TimedRobot {
         IS_REAL_ROBOT ? PneumaticsModuleType.REVPH : PneumaticsModuleType.CTREPCM;
 
   private static final int SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL = 2;
-  private static final int SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL = IS_REAL_ROBOT ? 10 : 5;
+  private static final int SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL = 10;
   private static final int INTAKE_RELEASE_FORWARD_CHANNEL = 1;
   private static final int INTAKE_RELEASE_REVERSE_CHANNEL = IS_REAL_ROBOT ? 9 : 7;
   private static final int FIRST_SPARE_CHANNEL = 0;
-  private static final int SECOND_SPARE_CHANNEL = IS_REAL_ROBOT ? 8 : 6;
+  private static final int SECOND_SPARE_CHANNEL = 8;
   private static final int LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL = 4;
   private static final int LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL = 12;
   private static final int RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL = 3;
@@ -73,7 +74,7 @@ public class Robot extends TimedRobot {
 
   WPI_TalonFX shooterHoodAdjustment;
 
-  RobotSolenoid diffSolenoids[] = {rightClimberRelease, leftClimberRelease, shooterHammer, intakeRelease};
+  RobotSolenoid[] diffSolenoids = new RobotSolenoid[4];
 
   PS4Controller logitech;
   XboxController xbox;
@@ -108,6 +109,8 @@ public class Robot extends TimedRobot {
   double[] direction = {0.0, 0.0, 0.0};
 
   WPI_Pigeon2 pigeon2;
+
+  AnalogPotentiometer analogPotentiometer;
 
   private final int RADIUS_OF_WHEEL = 3;
   private final double GEAR_RATIO = 10.71;
@@ -206,17 +209,13 @@ public class Robot extends TimedRobot {
     backLeft.setInverted(true);
     frontLeft.setInverted(true);
 
-
-    /*
-    CHANGE LOCATIONS
-     */
     shooter = new WPI_TalonFX(SHOOTER_ID);
-    shooterHammer = new RobotSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL, pH);
+    shooterHammer = new RobotSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL, pH, 0.3);
 //    shooterHammer = pH.makeDoubleSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
 //    shooterHammer = createDoubleSolenoid(SHOOTER_HAMMER_RELEASE_FORWARD_CHANNEL, SHOOTER_HAMMER_RELEASE_REVERSE_CHANNEL);
 
     intake = new WPI_TalonSRX(INTAKE_ID);
-    intakeRelease = new RobotSolenoid(INTAKE_RELEASE_FORWARD_CHANNEL, INTAKE_RELEASE_REVERSE_CHANNEL, pH);
+    intakeRelease = new RobotSolenoid(INTAKE_RELEASE_FORWARD_CHANNEL, INTAKE_RELEASE_REVERSE_CHANNEL, pH, 0.3);
 //    intakeRelease = pH.makeDoubleSolenoid(INTAKE_RELEASE_FORWARD_CHANNEL, INTAKE_RELEASE_REVERSE_CHANNEL);
 //    leftIntakeRelease = createDoubleSolenoid(LEFT_INTAKE_RELEASE_FORWARD_CHANNEL, LEFT_INTAKE_RELEASE_REVERSE_CHANNEL);
 //    rightIntakeRelease = createDoubleSolenoid(RIGHT_INTAKE_RELEASE_FORWARD_CHANNEL, RIGHT_INTAKE_RELEASE_REVERSE_CHANNEL);
@@ -225,14 +224,25 @@ public class Robot extends TimedRobot {
     rightClimber = new WPI_TalonFX(WINCH_FOLLOWER_ID);
 
     if (IS_REAL_ROBOT) {
-      leftClimberRelease = new RobotSolenoid(LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL, pH);
-      rightClimberRelease = new RobotSolenoid(RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL, pH);
+      leftClimberRelease = new RobotSolenoid(LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL, pH, 0.3);
+      rightClimberRelease = new RobotSolenoid(RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL, pH, 0.3);
 //      leftClimberRelease = pH.makeDoubleSolenoid(LEFT_CLIMBER_RELEASE_FORWARD_CHANNEL, LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL);
 //      rightClimberRelease = pH.makeDoubleSolenoid(RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL, RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL);
     }
 
     shooterHoodAdjustment = new WPI_TalonFX(SHOOTER_HOOD_ID);
 
+    /*
+          testFalcon.configSelectedFeedbackSensor(FeedbackDevice.IntegratedSensor);
+      testFalcon.setSelectedSensorPosition(0.0);
+
+      testFalcon.selectProfileSlot(0, 0);
+      testFalcon.config_kP(0, SHOOTER_kP);
+      testFalcon.config_kI(0, SHOOTER_kI);
+      testFalcon.config_kD(0, SHOOTER_kD);
+      testFalcon.configClosedLoopPeakOutput(0, 1.0);
+      testFalcon.configPeakOutputForward(1.0);
+     */
     shooter.configSelectedFeedbackSensor(FeedbackDevice.IntegratedSensor);
     shooter.setSelectedSensorPosition(0.0);
 
@@ -250,6 +260,7 @@ public class Robot extends TimedRobot {
 
 //    pigeon.getYawPitchRoll(direction);
     pigeon2 = new WPI_Pigeon2(PIDGEON_ID);
+    analogPotentiometer = new AnalogPotentiometer(0);
 //    try {
 //      arduino = new SerialPort(115200, SerialPort.Port.kUSB);
 //    } catch (Exception exception){
@@ -261,7 +272,7 @@ public class Robot extends TimedRobot {
 //      }
 //    }
 //
-//    limeLight = NetworkTableInstance.getDefault().getTable("limelight-ed");
+    limeLight = NetworkTableInstance.getDefault().getTable("limelight-ed");
 
     play.setDefaultOption("Do Nothing", Play.DRIVE_BACK);
     play.addOption("Do Nothing", Play.DO_NOTHING);
@@ -269,6 +280,10 @@ public class Robot extends TimedRobot {
     play.addOption("Drive Back and Shoot 2 Balls", Play.DRIVE_BACK_GET_TWO_BALLS);
     play.addOption("Test", Play.TEST);
     SmartDashboard.putData(play);
+    diffSolenoids[0] = rightClimberRelease;
+    diffSolenoids[1] = leftClimberRelease;
+    diffSolenoids[2] = shooterHammer;
+    diffSolenoids[3] = intakeRelease;
   }
 
   @Override
@@ -441,7 +456,8 @@ public class Robot extends TimedRobot {
       case TEST:
         switch (step) {
           case 0:
-            testFalcon.set(TalonFXControlMode.Velocity, 6380 * 2048/600);
+//            testFalcon.set(TalonFXControlMode.Velocity, 6500 * 2048/600);
+            System.out.println(findDistanceToHub(limeLight.getEntry("ty" ).getDouble(0)));
             //step++;
             break;
           case 1:
@@ -486,7 +502,7 @@ public class Robot extends TimedRobot {
     frontLeft.setSelectedSensorPosition(0.0);
     driveTrain = new MecanumDrive(frontLeft, backLeft, frontRight, backRight);
     //limeLight.getEntry("pipeline").setNumber(0);
-
+    testFalcon.set(TalonFXControlMode.Velocity, 0);
   }
 
   @Override
@@ -705,7 +721,7 @@ public class Robot extends TimedRobot {
   }
 
   private double findDistanceToHub(double limelightAngle) {
-    return 67.5/Math.atan(40+limelightAngle);
+    return 67.5/Math.tan((40+limelightAngle)*(Math.PI/180));
   }
 
   private double findShooterVelocity(double distanceToHub) {
