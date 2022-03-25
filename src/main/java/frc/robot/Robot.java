@@ -90,6 +90,7 @@ public class Robot extends TimedRobot {
   POVButton joystickPOV_315;
   JoystickButton joystickButton3;
   JoystickButton joystickButton4;
+  JoystickButton joystickButton5;
   JoystickButton climberSafety1;
   JoystickButton climberSafety2;
   JoystickButton climberBackward;
@@ -249,6 +250,7 @@ public class Robot extends TimedRobot {
      */
     shooter.configSelectedFeedbackSensor(FeedbackDevice.IntegratedSensor);
     shooter.setSelectedSensorPosition(0.0);
+    shooter.setNeutralMode(NeutralMode.Coast);
 
     shooter.selectProfileSlot(0, 0);
     shooter.config_kP(0, SHOOTER_kP);
@@ -514,6 +516,7 @@ public class Robot extends TimedRobot {
 
     joystickButton3 = new JoystickButton(joystick, 3);
     joystickButton4 = new JoystickButton(joystick, 4);
+    joystickButton5 = new JoystickButton(joystick, 5);
     climberBackward = new JoystickButton(joystick, 9);
 
     joystickButton11 = new JoystickButton(joystick, 11);
@@ -521,7 +524,7 @@ public class Robot extends TimedRobot {
 
     climberSafety1 = new JoystickButton(joystick, 7);
     climberSafety2 = new JoystickButton(joystick, 8);
-    climberRelease = new JoystickButton(joystick, 3);
+    climberRelease = new JoystickButton(joystick, 5);
     //leftClimber.follow(rightClimber);
     leftClimber.setInverted(true);
 //    pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
@@ -635,9 +638,9 @@ public class Robot extends TimedRobot {
     }
 
     if (joystickButton12.get()) {
-      shooterHoodAdjustment.set(TalonFXControlMode.PercentOutput, 0.2);
+      shooterHoodAdjustment.set(TalonFXControlMode.PercentOutput, 0.25);
     } else if (joystickButton11.get()) {
-      shooterHoodAdjustment.set(TalonFXControlMode.PercentOutput, -0.2);
+      shooterHoodAdjustment.set(TalonFXControlMode.PercentOutput, -0.25);
     } else {
       shooterHoodAdjustment.set(TalonFXControlMode.PercentOutput, 0.0);
     }
