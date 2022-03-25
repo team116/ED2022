@@ -539,7 +539,10 @@ public class Robot extends TimedRobot {
 
     if (joystickButton4.get() || joystickButton3.get() /*&& rightIntakeRelease.get() == DoubleSolenoid.Value.kForward*/) {
       //shooter.set(ControlMode.Velocity, 13000*(joystick.getThrottle()+1)/2);
-      shooter.set(ControlMode.PercentOutput, (joystick.getThrottle()+1)/2);
+      /***
+       * CHECK TO SEE IF THE MATH FOR THE JOYSTICK THROTTLE INPUT IS CORRECT, I MAY BE WRONG HERE
+       */
+      shooter.set(ControlMode.PercentOutput, -(joystick.getThrottle()-1)/2);
     } else if (joystick.getTop() && joystick.getTriggerPressed()){
 //      shooter.set(ControlMode.Velocity, findShooterVelocity(findDistanceToHub(limeLight.getEntry("ty").getDouble(0))));
     } else {
@@ -547,19 +550,10 @@ public class Robot extends TimedRobot {
     }
 
     if (joystick.getTriggerPressed()) {
-//      if (shooterHammer.get() != DoubleSolenoid.Value.kOff) {
-//        shooterHammer.set(DoubleSolenoid.Value.kOff);
-//      }
-      if (shooterHammer.get() != DoubleSolenoid.Value.kForward) {
-        shooterHammer.set(DoubleSolenoid.Value.kForward);
-      }
+      shooterHammer.set(DoubleSolenoid.Value.kReverse);
+
     } else {
-//      if (shooterHammer.get() != DoubleSolenoid.Value.kOff) {
-//        shooterHammer.set(DoubleSolenoid.Value.kOff);
-//      }
-      if (shooterHammer.get() != DoubleSolenoid.Value.kReverse) {
-        shooterHammer.set(DoubleSolenoid.Value.kReverse);
-      }
+      shooterHammer.set(DoubleSolenoid.Value.kForward);
     }
 
     if (joystick.getTop()) {
@@ -609,8 +603,8 @@ public class Robot extends TimedRobot {
     } else if (joystickPOV_45.get()) {
       rightClimber.set(TalonFXControlMode.PercentOutput, -0.5);
     } else {
-        rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
-        leftClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+      rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+      leftClimber.set(TalonFXControlMode.PercentOutput, 0.0);
 
     }
 
