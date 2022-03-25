@@ -88,7 +88,10 @@ public class Robot extends TimedRobot {
   POVButton joystickPOV_225;
   POVButton joystickPOV_270;
   POVButton joystickPOV_315;
+  JoystickButton joystickButton3;
   JoystickButton joystickButton4;
+  JoystickButton climberSafety1;
+  JoystickButton climberSafety2;
   JoystickButton climberBackward;
   JoystickButton climberRelease;
   JoystickButton joystickButton11;
@@ -138,7 +141,7 @@ public class Robot extends TimedRobot {
   private final int WINCH_RIGHT_ID = 7;
   private final int WINCH_FOLLOWER_ID = 8;
   private final int SHOOTER_HOOD_ID = 9;
-  private final int PIDGEON_ID = 12;
+  private final int PIGEON_ID = 12;
 //  private final int PDP_ID = 14;
   private final int PCM_ID = 15;
 
@@ -149,6 +152,7 @@ public class Robot extends TimedRobot {
     DRIVE_BACK_GET_TWO_BALLS,
     DO_NOTHING,
     DRIVE_BACK,
+    SHOOT_ONE_BALL_AND_DRIVE_BACK,
     TEST
   }
 
@@ -254,12 +258,12 @@ public class Robot extends TimedRobot {
 
     shooter.set(TalonFXControlMode.Velocity, 0.0);
 
-//    pigeon = new PigeonIMU(PIDGEON_ID);
+//    pigeon = new PigeonIMU(PIGEON_ID);
 //    pigeon.configFactoryDefault();
 //    pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
 
 //    pigeon.getYawPitchRoll(direction);
-    pigeon2 = new WPI_Pigeon2(PIDGEON_ID);
+    pigeon2 = new WPI_Pigeon2(PIGEON_ID);
     analogPotentiometer = new AnalogPotentiometer(0);
 //    try {
 //      arduino = new SerialPort(115200, SerialPort.Port.kUSB);
@@ -378,7 +382,6 @@ public class Robot extends TimedRobot {
         switch (step) {
           case 0:
 
-            intakeRelease.set(DoubleSolenoid.Value.kForward);
             step++;
             timer.reset();
             break;
@@ -453,6 +456,28 @@ public class Robot extends TimedRobot {
             break;
       }
       break;
+
+      case SHOOT_ONE_BALL_AND_DRIVE_BACK:
+        switch (step) {
+          case 0:
+            shooter.set(TalonFXControlMode.Velocity, 4000);
+            if (timer.get() > 6.0) {
+              timer.reset();
+              step++;
+            }
+            break;
+          case 1:
+            shooterHammer.set(DoubleSolenoid.Value.kForward);
+            if (timer.get() > 1.0) {
+             step++;
+            }
+            break;
+          case 2:
+            chosenPlay = Play.DRIVE_BACK;
+            break;
+        }
+        break;
+
       case TEST:
         switch (step) {
           case 0:
@@ -487,21 +512,24 @@ public class Robot extends TimedRobot {
     joystickPOV_270 = new POVButton(joystick, 270);
     joystickPOV_315 = new POVButton(joystick, 315);
 
+    joystickButton3 = new JoystickButton(joystick, 3);
     joystickButton4 = new JoystickButton(joystick, 4);
     climberBackward = new JoystickButton(joystick, 9);
 
     joystickButton11 = new JoystickButton(joystick, 11);
     joystickButton12 = new JoystickButton(joystick, 12);
 
+    climberSafety1 = new JoystickButton(joystick, 7);
+    climberSafety2 = new JoystickButton(joystick, 8);
     climberRelease = new JoystickButton(joystick, 3);
-    leftClimber.follow(rightClimber);
+    //leftClimber.follow(rightClimber);
     leftClimber.setInverted(true);
 //    pigeon.enterCalibrationMode(PigeonIMU.CalibrationMode.BootTareGyroAccel);
 //    pigeon.configFactoryDefault();
     pigeon2.reset();
     frontLeft.setSelectedSensorPosition(0.0);
     driveTrain = new MecanumDrive(frontLeft, backLeft, frontRight, backRight);
-    //limeLight.getEntry("pipeline").setNumber(0);
+    limeLight.getEntry("pipeline").setNumber(0);
     testFalcon.set(TalonFXControlMode.Velocity, 0);
   }
 
@@ -509,7 +537,7 @@ public class Robot extends TimedRobot {
   public void teleopPeriodic() {
     compressor.enableAnalog(100, 120);
 
-    if (joystick.getTriggerPressed() /*&& rightIntakeRelease.get() == DoubleSolenoid.Value.kForward*/) {
+    if (joystickButton4.get() || joystickButton3.get() /*&& rightIntakeRelease.get() == DoubleSolenoid.Value.kForward*/) {
       //shooter.set(ControlMode.Velocity, 13000*(joystick.getThrottle()+1)/2);
       shooter.set(ControlMode.PercentOutput, (joystick.getThrottle()+1)/2);
     } else if (joystick.getTop() && joystick.getTriggerPressed()){
@@ -518,7 +546,7 @@ public class Robot extends TimedRobot {
       shooter.set(TalonFXControlMode.Velocity, 0.0);
     }
 
-    if (joystickButton4.get()) {
+    if (joystick.getTriggerPressed()) {
 //      if (shooterHammer.get() != DoubleSolenoid.Value.kOff) {
 //        shooterHammer.set(DoubleSolenoid.Value.kOff);
 //      }
@@ -570,18 +598,23 @@ public class Robot extends TimedRobot {
       }
     }
 
-    if (joystickPOV_315.get() || joystickPOV_0.get() || joystickPOV_45.get()) {
-
+    if (joystickPOV_0.get()) {
       rightClimber.set(TalonFXControlMode.PercentOutput, -0.5);
+      leftClimber.set(TalonFXControlMode.PercentOutput, -0.5);
     } else if (joystickPOV_180.get() || joystickPOV_225.get() || joystickPOV_135.get()) {
-
       rightClimber.set(TalonFXControlMode.PercentOutput, 0.5);
+      leftClimber.set(TalonFXControlMode.PercentOutput, 0.5);
+    } else if (joystickPOV_315.get()) {
+      leftClimber.set(TalonFXControlMode.PercentOutput, -0.5);
+    } else if (joystickPOV_45.get()) {
+      rightClimber.set(TalonFXControlMode.PercentOutput, -0.5);
     } else {
+        rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+        leftClimber.set(TalonFXControlMode.PercentOutput, 0.0);
 
-      rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
     }
 
-    boolean climberReleasedIsBeingPressed = climberRelease.get();
+    boolean climberReleasedIsBeingPressed = climberRelease.get() && (climberSafety1.get() || climberSafety2.get());
 
     if (climberReleasedIsBeingPressed && !climberReleasePreviouslyPressed) {
       climberIsReleased = !climberIsReleased;
@@ -623,7 +656,7 @@ public class Robot extends TimedRobot {
     }
 
 //    System.out.println(shooter.getSelectedSensorVelocity());
-    SmartDashboard.putNumber("Shooter Speed", shooter.getSelectedSensorVelocity()/2);
+    SmartDashboard.putNumber("Shooter Speed", shooter.getSelectedSensorVelocity()*(600.0/2048.0));
   }
 
   @Override
@@ -734,7 +767,7 @@ public class Robot extends TimedRobot {
   }
 
   private double applyDeadBandAndShape(double value) {
-    if (value > 0.1 && value < -0.1) {
+    if (value < 0.1 && value > -0.1) {
       return 0.0;
     } else {
 
