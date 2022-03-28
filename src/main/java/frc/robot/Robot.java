@@ -95,6 +95,7 @@ public class Robot extends TimedRobot {
   JoystickButton joystickButton5;
   JoystickButton joystickButton6;
   JoystickButton joystickButton7;
+  JoystickButton joystickButton8;
   JoystickButton climberSafety1;
   JoystickButton climberSafety2;
   JoystickButton joystickButton9;
@@ -293,6 +294,7 @@ public class Robot extends TimedRobot {
     play.setDefaultOption("Do Nothing", Play.DRIVE_BACK);
     play.addOption("Do Nothing", Play.DO_NOTHING);
     play.addOption("Drive Back", Play.DRIVE_BACK);
+    play.addOption("Drive Back and Shoot One Ball", Play.SHOOT_ONE_BALL_AND_DRIVE_BACK);
     play.addOption("Drive Back and Shoot 2 Balls", Play.DRIVE_BACK_GET_TWO_BALLS);
     play.addOption("Test", Play.TEST);
     SmartDashboard.putData(play);
@@ -389,6 +391,7 @@ public class Robot extends TimedRobot {
 
   @Override
   public void autonomousPeriodic() {
+    compressor.enableAnalog(100, 120);
     switch (chosenPlay) {
       case DO_NOTHING:
         break;
@@ -412,7 +415,7 @@ public class Robot extends TimedRobot {
 //              step++;
 //            }
 
-            runToInchesForTime(36, 5);
+            //runToInchesForTime(36, 5);
             break;
           case 2:
             backRight.set(TalonSRXControlMode.PercentOutput, 0.0);
@@ -479,20 +482,45 @@ public class Robot extends TimedRobot {
       case SHOOT_ONE_BALL_AND_DRIVE_BACK:
         switch (step) {
           case 0:
-            shooter.set(TalonFXControlMode.Velocity, 4000*2048/600);
+            intakeRelease.set(DoubleSolenoid.Value.kForward);
+            step++;
+            timer.reset();
+            break;
+
+          case 1:
+            if (timer.get() < 2.00) {
+              backRight.set(TalonSRXControlMode.PercentOutput, 0.2);
+              frontRight.set(TalonSRXControlMode.PercentOutput, 0.2);
+              backLeft.set(TalonSRXControlMode.PercentOutput, 0.2);
+              frontLeft.set(TalonSRXControlMode.PercentOutput, 0.2);
+            } else {
+              intakeRelease.set(DoubleSolenoid.Value.kReverse);
+              timer.reset();
+              step++;
+            }
+            break;
+          case 2:
+            backRight.set(TalonSRXControlMode.PercentOutput, 0.0);
+            frontRight.set(TalonSRXControlMode.PercentOutput, 0.0);
+            backLeft.set(TalonSRXControlMode.PercentOutput, 0.0);
+            frontLeft.set(TalonSRXControlMode.PercentOutput, 0.0);
+            shooter.set(TalonFXControlMode.Velocity, 5000*2048/600);
             if (timer.get() > 6.0) {
               timer.reset();
               step++;
             }
             break;
-          case 1:
-            shooterHammer.set(DoubleSolenoid.Value.kForward);
+          case 3:
+            shooterHammer.set(DoubleSolenoid.Value.kReverse);
             if (timer.get() > 1.0) {
              step++;
             }
             break;
-          case 2:
-            chosenPlay = Play.DRIVE_BACK;
+          case 4:
+            shooterHammer.set(DoubleSolenoid.Value.kForward);
+
+            shooter.set(TalonFXControlMode.PercentOutput, 0.0);
+            // chosenPlay = Play.DRIVE_BACK;
             break;
         }
         break;
@@ -513,8 +541,9 @@ public class Robot extends TimedRobot {
 //    System.out.printf("Front Left: %f, Front Right: %f, Back Left: %f, Back Right: %f %n",
 //            frontLeft.getSelectedSensorPosition(), frontRight.getSelectedSensorPosition(),backLeft.getSelectedSensorPosition(),backRight.getSelectedSensorPosition());
 //    System.out.println("Pigeon: " + pigeon2.getAngle());
-    System.out.println(testFalcon.getSelectedSensorVelocity()*600/2048);
+    //System.out.println(testFalcon.getSelectedSensorVelocity()*600/2048);
 //    System.out.println(testFalcon.getSelectedSensorPosition());
+    SmartDashboard.putNumber("Shooter Speed", shooter.getSelectedSensorVelocity()*600/2048);
   }
 
   @Override
@@ -536,6 +565,7 @@ public class Robot extends TimedRobot {
     joystickButton5 = new JoystickButton(joystick, 5);
     joystickButton6 = new JoystickButton(joystick, 6);
     joystickButton7 = new JoystickButton(joystick, 7);
+    joystickButton8 = new JoystickButton(joystick, 8);
     joystickButton9 = new JoystickButton(joystick, 9);
     joystickButton10 = new JoystickButton(joystick, 10);
     joystickButton11 = new JoystickButton(joystick, 11);
@@ -601,14 +631,18 @@ public class Robot extends TimedRobot {
   public void teleopPeriodic() {
     compressor.enableAnalog(100, 120);
 
-    if (joystickButton11.get() /*&& rightIntakeRelease.get() == DoubleSolenoid.Value.kForward*/) {
+    if (joystickButton8.get() /*&& rightIntakeRelease.get() == DoubleSolenoid.Value.kForward*/) {
 //      shooter.set(ControlMode.Velocity, 6380*(2048/600)*(-(joystick.getThrottle()-1)/2));
       /***
        * CHECK TO SEE IF THE MATH FOR THE JOYSTICK THROTTLE INPUT IS CORRECT, I MAY BE WRONG HERE
        */
-      shooter.set(ControlMode.PercentOutput, -(joystick.getThrottle()-1)/2);
-    } else if (joystick.getTop() && joystick.getTriggerPressed()){
+      shooter.set(TalonFXControlMode.Velocity, 5000 * 2048 / 600);
+
+    } //else if (joystick.getTop() && joystick.getTriggerPressed()){
 //      shooter.set(ControlMode.Velocity, findShooterVelocity(findDistanceToHub(limeLight.getEntry("ty").getDouble(0))));
+//  }
+     else if (joystickButton11.get()) {
+      shooter.set(ControlMode.PercentOutput, -(joystick.getThrottle()-1)/2);
     } else {
       shooter.set(TalonFXControlMode.PercentOutput, 0.0);
     }
@@ -831,12 +865,12 @@ public class Robot extends TimedRobot {
   }
 
   private double applyDeadBandAndShape(double value) {
-
-    if (value < 0) {
-      return -(value * value);
-    } else {
-      return value * value;
-    }
-
+//
+//    if (value < 0) {
+//      return -(value * value);
+//    } else {
+//      return value * value;
+//    }
+    return value * value * value;
   }
 }
