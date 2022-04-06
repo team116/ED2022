@@ -6,7 +6,6 @@ package frc.robot;
 import com.ctre.phoenix.motorcontrol.*;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonFX;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
-import com.ctre.phoenix.sensors.MagnetFieldStrength;
 import com.ctre.phoenix.sensors.PigeonIMU;
 
 import com.ctre.phoenix.sensors.WPI_Pigeon2;
@@ -45,6 +44,12 @@ public class Robot extends TimedRobot {
   private static final int LEFT_CLIMBER_RELEASE_REVERSE_CHANNEL = 12;
   private static final int RIGHT_CLIMBER_RELEASE_FORWARD_CHANNEL = 3;
   private static final int RIGHT_CLIMBER_RELEASE_REVERSE_CHANNEL = 11;
+
+  private static final double LEFT_CLIMBER_LIMIT = 0.75;
+  private static final double RIGHT_CLIMBER_LIMIT = 0.75;
+  private static final double LEFT_CLIMBER_MAX_LIMIT = 0.89;
+  private static final double RIGHT_CLIMBER_MAX_LIMIT = 0.89;
+
 
   SerialPort arduino;
 
@@ -108,6 +113,8 @@ public class Robot extends TimedRobot {
   boolean climberIsReleased;
   boolean climberReleasePreviouslyPressed;
 
+  boolean xboxPreviouslyPressed = false;
+
   boolean intakeIsReleased;
   boolean intakeReleasePreviouslyPressed;
 
@@ -125,7 +132,9 @@ public class Robot extends TimedRobot {
 
   WPI_Pigeon2 pigeon2;
 
-  AnalogPotentiometer analogPotentiometer;
+  AnalogPotentiometer shooterHoodPotentiometer;
+  AnalogPotentiometer climberRightPotentiometer;
+  AnalogPotentiometer climberLeftPotentiometer;
 
 //  DigitalInput climberLimitSwitchLeft;
 //  DigitalInput climberLimitSwitchRight;
@@ -137,9 +146,9 @@ public class Robot extends TimedRobot {
   private final double TICKS_PER_INCH = (TICKS_PER_REVOLUTION * GEAR_RATIO) / (RADIUS_OF_WHEEL * 2 * Math.PI);
 
   // THIS WORKS FOR VELOCITY (FOR SOME REASON)
-  private final double SHOOTER_kP = .1;
-  private final double SHOOTER_kI = 0.001;
-  private final double SHOOTER_kD = 0.0;
+  private final double SHOOTER_kP = .4; // .1
+  private final double SHOOTER_kI = 0.001; // .001
+  private final double SHOOTER_kD = 0.0; // 0.0
 
   // for Falcons
   private final double DRIVETRAIN_kP  = 1.0;
@@ -170,6 +179,14 @@ public class Robot extends TimedRobot {
     SHOOT_ONE_BALL_AND_DRIVE_BACK,
     TEST
   }
+
+  enum Location {
+    CLOSE,
+    MID,
+    FAR
+  }
+
+  Location location = Location.MID;
 
   SendableChooser<Play> play = new SendableChooser<>();
 
@@ -291,7 +308,9 @@ public class Robot extends TimedRobot {
 
 //    pigeon.getYawPitchRoll(direction);
     pigeon2 = new WPI_Pigeon2(PIGEON_ID);
-    analogPotentiometer = new AnalogPotentiometer(0);
+    shooterHoodPotentiometer = new AnalogPotentiometer(0);
+    climberRightPotentiometer = new AnalogPotentiometer(1);
+    climberLeftPotentiometer = new AnalogPotentiometer(2);
 //    try {
 //      arduino = new SerialPort(115200, SerialPort.Port.kUSB);
 //    } catch (Exception exception){
@@ -395,6 +414,9 @@ public class Robot extends TimedRobot {
 //    }
     step = 0;
     pigeon2.reset();
+    driveTrain = new MecanumDrive(frontLeft, backLeft, frontRight, backRight);
+    driveTrain.setSafetyEnabled(false);
+    limeLight.getEntry("pipeline").setNumber(3);
 
     timer = new Timer();
     timer.start();
@@ -429,7 +451,7 @@ public class Robot extends TimedRobot {
 //              step++;
 //            }
 
-            runToInchesForTime(36, 5);
+            runToInchesForPower(36, 0.2);
             break;
           case 2:
             backRight.set(TalonSRXControlMode.PercentOutput, 0.0);
@@ -452,7 +474,7 @@ public class Robot extends TimedRobot {
             break;
 
           case 1:
-            runToInchesForTime(36, 5.0);
+            runToInchesForPower(36, 0.2);
             break;
 
           case 2:
@@ -460,6 +482,7 @@ public class Robot extends TimedRobot {
             break;
 
           case 3:
+            driveTrain.driveCartesian(limeLight.getEntry("ty").getDouble(0)/9, 0, -limeLight.getEntry("tx").getDouble(0)/55);
             shooter.set(TalonFXControlMode.Velocity, 5000 * 2048/600);
             if (timer.get() > 5.0) {
               step++;
@@ -488,7 +511,14 @@ public class Robot extends TimedRobot {
           case 6:
             if (timer.get() > 1.00) {
               shooterHammer.set(DoubleSolenoid.Value.kReverse);
+              step++;
             }
+            break;
+          case 7:
+            frontLeft.set(TalonSRXControlMode.PercentOutput, 0.0);
+            frontRight.set(TalonSRXControlMode.PercentOutput, 0.0);
+            backLeft.set(TalonSRXControlMode.PercentOutput, 0.0);
+            backRight.set(TalonSRXControlMode.PercentOutput, 0.0);
             break;
           default:
             System.out.println("STOOOOOPID");
@@ -511,7 +541,7 @@ public class Robot extends TimedRobot {
               backLeft.set(TalonSRXControlMode.PercentOutput, 0.2);
               frontLeft.set(TalonSRXControlMode.PercentOutput, 0.2);
             } else {
-              intakeRelease.set(DoubleSolenoid.Value.kReverse);
+//              intakeRelease.set(DoubleSolenoid.Value.kReverse);
               timer.reset();
               step++;
             }
@@ -521,20 +551,21 @@ public class Robot extends TimedRobot {
             frontRight.set(TalonSRXControlMode.PercentOutput, 0.0);
             backLeft.set(TalonSRXControlMode.PercentOutput, 0.0);
             frontLeft.set(TalonSRXControlMode.PercentOutput, 0.0);
-            shooter.set(TalonFXControlMode.Velocity, 5000*2048/600);
+            shooter.set(TalonFXControlMode.Velocity, 4600 * 2048/600);
+//            driveTrain.driveCartesian(limeLight.getEntry("ty").getDouble(0)/9, 0, -limeLight.getEntry("tx").getDouble(0)/55);
             if (timer.get() > 6.0) {
               timer.reset();
               step++;
             }
             break;
           case 3:
-            shooterHammer.set(DoubleSolenoid.Value.kReverse);
+            shooterHammer.set(DoubleSolenoid.Value.kForward);
             if (timer.get() > 1.0) {
              step++;
             }
             break;
           case 4:
-            shooterHammer.set(DoubleSolenoid.Value.kForward);
+            shooterHammer.set(DoubleSolenoid.Value.kReverse);
 
             shooter.set(TalonFXControlMode.PercentOutput, 0.0);
             // chosenPlay = Play.DRIVE_BACK;
@@ -608,7 +639,7 @@ public class Robot extends TimedRobot {
     driveTrain.setSafetyEnabled(false);
 //    driveTrain.setExpiration(1.0);
     driveTrain.setDeadband(0.05);
-    limeLight.getEntry("pipeline").setNumber(3);
+    limeLight.getEntry("pipeline").setNumber(0);
 //    testFalcon.set(TalonFXControlMode.Velocity, 0);
 //    rightClimberRelease.set(DoubleSolenoid.Value.kForward);
 //    leftClimberRelease.set(DoubleSolenoid.Value.kForward);
@@ -655,16 +686,28 @@ public class Robot extends TimedRobot {
 
     if (joystickButton8.get()) {
 //      shooter.set(ControlMode.Velocity, 6380*(2048/600)*(-(joystick.getThrottle()-1)/2));
+//      switch (location) {
+//        case CLOSE:
+//          shooter.set(TalonFXControlMode.Velocity, 5000 * 2048 / 600);
+//          break;
+//        case MID:
+//          shooter.set(TalonFXControlMode.Velocity, 5500 * 2048 / 600);
+//          break;
+//        case FAR:
+//          shooter.set(TalonFXControlMode.Velocity, 5800 * 2048 / 600);
+//
+//          break;
+//      }
       shooter.set(TalonFXControlMode.Velocity, 5000 * 2048 / 600);
-
     } else if (joystickButton11.get()) {
-      shooter.set(ControlMode.PercentOutput, -(joystick.getThrottle()-1)/2);
-    }//else if (joystick.getTop() && joystick.getTriggerPressed()){
-//      shooter.set(ControlMode.Velocity, findShooterVelocity(findDistanceToHub(limeLight.getEntry("ty").getDouble(0))));
-//  }
-    else {
+      shooter.set(ControlMode.Velocity, (6380 * 2048/600) * (-(joystick.getThrottle()-1)/2));
+    } else {
       shooter.set(TalonFXControlMode.PercentOutput, 0.0);
     }
+
+    //else if (joystick.getTop() && joystick.getTriggerPressed()){
+//      shooter.set(ControlMode.Velocity, findShooterVelocity(findDistanceToHub(limeLight.getEntry("ty").getDouble(0))));
+//  }
 
     if (joystick.getTriggerPressed()) {
       shooterHammer.set(DoubleSolenoid.Value.kForward);
@@ -673,16 +716,36 @@ public class Robot extends TimedRobot {
     }
 
     if (xbox.getBButton()) {
+//      if (!xboxPreviouslyPressed) {
+//        location = findLocation();
+//        switch (location) {
+//          case CLOSE:
+//            limeLight.getEntry("pipeline").setNumber(0);
+//            break;
+//          case MID:
+//            limeLight.getEntry("pipeline").setNumber(1);
+//            break;
+//          case FAR:
+//            limeLight.getEntry("pipeline").setNumber(2);
+//            break;
+//        }
+//      }
       driveTrain.driveCartesian(limeLight.getEntry("ty").getDouble(0)/9, 0, -limeLight.getEntry("tx").getDouble(0)/55);
+      xboxPreviouslyPressed = true;
+    } else if (xbox.getPOV(0) == 90) {
+      driveTrain.driveCartesian(0, -0.2, 0.0);
+    } else if (xbox.getPOV(0) == 270) {
+      driveTrain.driveCartesian(0.0, 0.2, 0.0);
     } else {
+//      limeLight.getEntry("pipeline").setNumber(7);
       driveTrain.driveCartesian(applyDeadBandAndShape(xbox.getLeftY()), applyDeadBandAndShape(-xbox.getLeftX()), applyDeadBandAndShape( -xbox.getRightX())/*, pigeon2.getAngle()*/);
 //      driveTrain.driveCartesian(xbox.getLeftY(), (xbox.getLeftX()), ( -xbox.getRightX())/*, pigeon2.getAngle()*/);
-
+      xboxPreviouslyPressed = false;
     }
 
 
     if (xbox.getYButton()) {
-      intake.set(ControlMode.PercentOutput, 1.0);
+      intake.set(ControlMode.PercentOutput, 0.70);
     } else {
       intake.set(TalonSRXControlMode.PercentOutput, 0.0);
     }
@@ -706,29 +769,73 @@ public class Robot extends TimedRobot {
       intakeRelease.set(DoubleSolenoid.Value.kReverse);
     }
 
+
     if (joystickPOV_0.get()) {
-//      if (!climberLimitSwitchLeft.get()) {
-        leftClimber.set(TalonFXControlMode.PercentOutput, -0.5);
-//      }
-//      if (!climberLimitSwitchRight.get()) {
-        rightClimber.set(TalonFXControlMode.PercentOutput, -0.5);
-//      }
+      if (climberLeftPotentiometer.get() <= LEFT_CLIMBER_MAX_LIMIT) {
+        if (leftClimberRelease.get() == DoubleSolenoid.Value.kForward && climberLeftPotentiometer.get() >= LEFT_CLIMBER_LIMIT && !joystickButton8.get()) {
+          leftClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+
+        } else {
+          leftClimber.set(TalonFXControlMode.PercentOutput, -0.75);
+
+        }
+      } else  {
+        leftClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+
+      }
+      if (climberRightPotentiometer.get() <= RIGHT_CLIMBER_MAX_LIMIT) {
+        if (rightClimberRelease.get() == DoubleSolenoid.Value.kForward && climberRightPotentiometer.get() >= RIGHT_CLIMBER_LIMIT && !joystickButton8.get()) {
+          rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+        } else {
+          rightClimber.set(TalonFXControlMode.PercentOutput, -0.75);
+        }
+      } else {
+        rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+
+      }
+
     } else if (joystickPOV_180.get() || joystickPOV_225.get() || joystickPOV_135.get()) {
-      rightClimber.set(TalonFXControlMode.PercentOutput, 0.5);
-      leftClimber.set(TalonFXControlMode.PercentOutput, 0.5);
+
+      rightClimber.set(TalonFXControlMode.PercentOutput, 0.75);
+      leftClimber.set(TalonFXControlMode.PercentOutput, 0.75);
+
     } else if (joystickButton5.get()) {
-//      if (!climberLimitSwitchLeft.get()) {
-        leftClimber.set(TalonFXControlMode.PercentOutput, -0.5);
-//      }
+
+      if (climberLeftPotentiometer.get() <= LEFT_CLIMBER_MAX_LIMIT) {
+        if (leftClimberRelease.get() == DoubleSolenoid.Value.kForward && climberLeftPotentiometer.get() >= LEFT_CLIMBER_LIMIT && !joystickButton8.get()) {
+          leftClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+
+        } else {
+          leftClimber.set(TalonFXControlMode.PercentOutput, -0.75);
+
+        }
+      } else  {
+        leftClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+
+      }
+
     } else if (joystickButton6.get()) {
-//      if (!climberLimitSwitchRight.get()) {
-        rightClimber.set(TalonFXControlMode.PercentOutput, -0.5);
-//      }
+
+      if (climberRightPotentiometer.get() <= RIGHT_CLIMBER_MAX_LIMIT) {
+        if (rightClimberRelease.get() == DoubleSolenoid.Value.kForward && climberRightPotentiometer.get() >= RIGHT_CLIMBER_LIMIT && !joystickButton8.get()) {
+          rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+        } else {
+          rightClimber.set(TalonFXControlMode.PercentOutput, -0.75);
+        }
+      } else {
+        rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
+
+      }
     } else if (joystickButton3.get()) {
-      leftClimber.set(TalonFXControlMode.PercentOutput, 0.5);
+
+      leftClimber.set(TalonFXControlMode.PercentOutput, 0.3);
+
     } else if (joystickButton4.get()) {
-      rightClimber.set(TalonFXControlMode.PercentOutput, 0.5);
+
+      rightClimber.set(TalonFXControlMode.PercentOutput, 0.3);
+
     } else {
+
       rightClimber.set(TalonFXControlMode.PercentOutput, 0.0);
       leftClimber.set(TalonFXControlMode.PercentOutput, 0.0);
 
@@ -776,6 +883,9 @@ public class Robot extends TimedRobot {
 //    System.out.println(shooter.getSelectedSensorVelocity());
     SmartDashboard.putNumber("Shooter Speed", shooter.getSelectedSensorVelocity()*(600.0/2048.0));
     SmartDashboard.putNumber("Compressor Pressure", compressor.getPressure());
+    SmartDashboard.putNumber("Right Climber Potentiometer", climberRightPotentiometer.get());
+    SmartDashboard.putNumber("Left Climber Potentiometer", climberLeftPotentiometer.get());
+    SmartDashboard.putNumber("Shooter Hood Potentiometer", shooterHoodPotentiometer.get());
   }
 
   @Override
@@ -819,6 +929,16 @@ public class Robot extends TimedRobot {
     //System.out.println(arduino.readString());
   }
 
+  public Location findLocation() {
+    if (limeLight.getEntry("ty").getDouble(0) >= -23 && limeLight.getEntry("ty").getDouble(0) < 0) {
+      return Location.CLOSE;
+    } else if (limeLight.getEntry("ty").getDouble(0) >= 0 && limeLight.getEntry("ty").getDouble(0) < 15) {
+      return Location.MID;
+    } else {
+      return Location.FAR;
+    }
+  }
+
   @Override
   public void simulationInit() {}
 
@@ -835,13 +955,15 @@ public class Robot extends TimedRobot {
     }
   }
 
-  private void runToInchesForTime(double inches, double time) {
-    backLeft.set(ControlMode.Position, TICKS_PER_INCH * inches);
-    frontLeft.set(ControlMode.Position, TICKS_PER_INCH * inches);
-    backRight.set(ControlMode.Position, TICKS_PER_INCH * inches);
-    frontRight.set(ControlMode.Position, TICKS_PER_INCH * inches);
+  private void runToInchesForPower(double inches, double power) {
 
-    if (timer.get() >= time) {
+
+    backLeft.set(ControlMode.PercentOutput, -power);
+    frontLeft.set(ControlMode.PercentOutput, -power);
+    backRight.set(ControlMode.PercentOutput, -power);
+    frontRight.set(ControlMode.PercentOutput, -power);
+
+    if (backLeft.getSelectedSensorPosition() <= -TICKS_PER_INCH * inches) {
       backLeft.set(ControlMode.PercentOutput, 0.0);
       frontLeft.set(ControlMode.PercentOutput, 0.0);
       backRight.set(ControlMode.PercentOutput, 0.0);
@@ -873,7 +995,7 @@ public class Robot extends TimedRobot {
   }
 
   private double findDistanceToHub(double limelightAngle) {
-    return 67.5/Math.tan((40+limelightAngle)*(Math.PI/180));
+    return 67.5/Math.tan((32+limelightAngle)*(Math.PI/180));
   }
 
   private double findShooterVelocity(double distanceToHub) {
