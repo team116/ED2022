@@ -413,10 +413,12 @@ public class Robot extends TimedRobot {
 //      testFalcon.set(ControlMode.Position, TICKS_PER_REVOLUTION);
 //    }
     step = 0;
+    intakeRelease.set(DoubleSolenoid.Value.kReverse);
     pigeon2.reset();
     driveTrain = new MecanumDrive(frontLeft, backLeft, frontRight, backRight);
     driveTrain.setSafetyEnabled(false);
-    limeLight.getEntry("pipeline").setNumber(3);
+    limeLight.getEntry("pipeline").setNumber(0);
+    limeLight.getEntry("ledMode").setNumber(3);
 
     timer = new Timer();
     timer.start();
@@ -451,7 +453,7 @@ public class Robot extends TimedRobot {
 //              step++;
 //            }
 
-            runToInchesForPower(36, 0.2);
+            runForTimeAtPower(4, 0.2);
             break;
           case 2:
             backRight.set(TalonSRXControlMode.PercentOutput, 0.0);
@@ -474,25 +476,32 @@ public class Robot extends TimedRobot {
             break;
 
           case 1:
-            runToInchesForPower(36, 0.2);
+            intake.set(TalonSRXControlMode.PercentOutput, 0.7);
+            runForTimeAtPower(3, 0.2);
+
             break;
 
           case 2:
             turnToDegreesAtSpeed(180, 0.2);
+
             break;
 
           case 3:
             driveTrain.driveCartesian(limeLight.getEntry("ty").getDouble(0)/9, 0, -limeLight.getEntry("tx").getDouble(0)/55);
             shooter.set(TalonFXControlMode.Velocity, 5000 * 2048/600);
-            if (timer.get() > 5.0) {
+            if (timer.get() > 3.0) {
               step++;
+              frontLeft.set(TalonSRXControlMode.PercentOutput, 0.0);
+              frontRight.set(TalonSRXControlMode.PercentOutput, 0.0);
+              backLeft.set(TalonSRXControlMode.PercentOutput, 0.0);
+              backRight.set(TalonSRXControlMode.PercentOutput, 0.0);
               timer.reset();
             }
             break;
 
           case 4:
             shooterHammer.set(DoubleSolenoid.Value.kForward);
-            if (timer.get() > 1.0) {
+            if (timer.get() > 0.5) {
               step++;
               shooterHammer.set(DoubleSolenoid.Value.kReverse);
               timer.reset();
@@ -501,7 +510,7 @@ public class Robot extends TimedRobot {
 
           case 5:
 
-            if (timer.get() > 1.00) {
+            if (timer.get() > 2.00) {
               shooterHammer.set(DoubleSolenoid.Value.kForward);
               step++;
               timer.reset();
@@ -515,10 +524,9 @@ public class Robot extends TimedRobot {
             }
             break;
           case 7:
-            frontLeft.set(TalonSRXControlMode.PercentOutput, 0.0);
-            frontRight.set(TalonSRXControlMode.PercentOutput, 0.0);
-            backLeft.set(TalonSRXControlMode.PercentOutput, 0.0);
-            backRight.set(TalonSRXControlMode.PercentOutput, 0.0);
+
+            intake.set(TalonSRXControlMode.PercentOutput, 0.0);
+            shooter.set(TalonFXControlMode.PercentOutput, 0.0);
             break;
           default:
             System.out.println("STOOOOOPID");
@@ -640,6 +648,7 @@ public class Robot extends TimedRobot {
 //    driveTrain.setExpiration(1.0);
     driveTrain.setDeadband(0.05);
     limeLight.getEntry("pipeline").setNumber(0);
+    limeLight.getEntry("ledMode").setNumber(3);
 //    testFalcon.set(TalonFXControlMode.Velocity, 0);
 //    rightClimberRelease.set(DoubleSolenoid.Value.kForward);
 //    leftClimberRelease.set(DoubleSolenoid.Value.kForward);
@@ -955,7 +964,7 @@ public class Robot extends TimedRobot {
     }
   }
 
-  private void runToInchesForPower(double inches, double power) {
+  private void runForTimeAtPower(double time, double power) {
 
 
     backLeft.set(ControlMode.PercentOutput, -power);
@@ -963,11 +972,12 @@ public class Robot extends TimedRobot {
     backRight.set(ControlMode.PercentOutput, -power);
     frontRight.set(ControlMode.PercentOutput, -power);
 
-    if (backLeft.getSelectedSensorPosition() <= -TICKS_PER_INCH * inches) {
+    if (timer.get() >= time) {
       backLeft.set(ControlMode.PercentOutput, 0.0);
       frontLeft.set(ControlMode.PercentOutput, 0.0);
       backRight.set(ControlMode.PercentOutput, 0.0);
       frontRight.set(ControlMode.PercentOutput, 0.0);
+      timer.reset();
       step++;
     }
   }
@@ -983,6 +993,7 @@ public class Robot extends TimedRobot {
       frontLeft.set(ControlMode.PercentOutput, 0.0);
       backRight.set(ControlMode.PercentOutput, 0.0);
       frontRight.set(ControlMode.PercentOutput, 0.0);
+      timer.reset();
       step++;
     }
   }
